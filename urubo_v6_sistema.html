@@ -1,0 +1,3769 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Urubo Village — Planilla de Carga</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+<!-- ═══════════════════════════════════════════
+     FIREBASE SDK
+═══════════════════════════════════════════ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, push, onValue, remove, set, get, update }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  /* ── MISMA FIREBASE QUE VISITAS ── */
+  const firebaseConfig = {
+    apiKey:            "AIzaSyC3Ot67mQDQSAbujXsfhPm3MbWaI7RgNEI",
+    authDomain:        "urubo-village-2.firebaseapp.com",
+    databaseURL:       "https://urubo-village-2-default-rtdb.firebaseio.com",
+    projectId:         "urubo-village-2",
+    storageBucket:     "urubo-village-2.firebasestorage.app",
+    messagingSenderId: "573171131459",
+    appId:             "1:573171131459:web:67f1dda19d7c46417ca0f6"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  /* ── REGISTROS: guardar bajo planilla/{asesorId}/{key} ── */
+  window._fbPushRegistro = (asesorId, data) =>
+    push(ref(db, `planilla/${asesorId}`), data);
+
+  window._fbListenRegistros = (asesorId, cb) =>
+    onValue(ref(db, `planilla/${asesorId}`), snap => {
+      const raw = snap.val() || {};
+      const arr = Object.entries(raw)
+        .map(([k,v]) => ({ ...v, _key: k, _asesorId: asesorId }))
+        .sort((a,b) => b.ts - a.ts);
+      cb(arr);
+    });
+
+  /* Admin: escucha TODOS los nodos de planilla */
+  window._fbListenTodos = (cb) =>
+    onValue(ref(db, 'planilla'), snap => {
+      const raw = snap.val() || {};
+      const arr = [];
+      Object.entries(raw).forEach(([asesorId, registros]) => {
+        Object.entries(registros || {}).forEach(([k, v]) => {
+          arr.push({ ...v, _key: k, _asesorId: asesorId });
+        });
+      });
+      arr.sort((a,b) => b.ts - a.ts);
+      cb(arr);
+    });
+
+  window._fbRemoveRegistro = (asesorId, key) =>
+    remove(ref(db, `planilla/${asesorId}/${key}`));
+
+  /* ── ASESORES (con PIN) ── */
+  window._fbListenAsesores = (cb) =>
+    onValue(ref(db, 'asesores_planilla'), snap => {
+      const raw = snap.val() || {};
+      cb(Object.entries(raw).map(([k,v]) => ({ ...v, _key: k })));
+    });
+
+  window._fbAddAsesor = (nombre, pin) =>
+    push(ref(db, 'asesores_planilla'), { nombre, pin });
+
+  window._fbRemoveAsesor = (key) =>
+    remove(ref(db, `asesores_planilla/${key}`));
+
+  /* ── INVENTARIO DE LOTES ── */
+  window._fbListenLotes = (cb) =>
+    onValue(ref(db, 'inventario_lotes'), snap => {
+      const raw = snap.val() || {};
+      const arr = Object.entries(raw).map(([k,v]) => ({ ...v, _key: k }));
+      arr.sort((a,b) => a.uv - b.uv || a.manzano - b.manzano || a.lote - b.lote);
+      cb(arr);
+    });
+
+  window._fbAddLote = (data) =>
+    push(ref(db, 'inventario_lotes'), data);
+
+  window._fbUpdateLote = (key, data) =>
+    update(ref(db, `inventario_lotes/${key}`), data);
+
+  window._fbRemoveLote = (key) =>
+    remove(ref(db, `inventario_lotes/${key}`));
+
+  window._fbUpdateAsesorPin = (key, pin) =>
+    update(ref(db, `asesores_planilla/${key}`), { pin });
+
+  /* ── ESTADOS DE GESTIÓN DINÁMICOS ── */
+  window._fbListenEstados = (cb) =>
+    onValue(ref(db, 'estados_cobranza'), snap => {
+      const raw = snap.val() || {};
+      cb(Object.entries(raw).map(([k,v]) => ({ ...v, _key: k })).sort((a,b)=>a.ts-b.ts));
+    });
+  window._fbAddEstado = (nombre, color, icono) =>
+    push(ref(db, 'estados_cobranza'), { nombre, color, icono, ts: Date.now() });
+  window._fbUpdateEstado = (key, data) =>
+    update(ref(db, `estados_cobranza/${key}`), data);
+  window._fbRemoveEstado = (key) =>
+    remove(ref(db, `estados_cobranza/${key}`));
+
+  /* ── GESTIONES / HISTORIAL POR CLIENTE ── */
+  window._fbPushGestion = (codigoPago, data) =>
+    push(ref(db, `gestiones_cobranza/${codigoPago}`), { ...data, ts: Date.now() });
+  window._fbListenGestiones = (codigoPago, cb) =>
+    onValue(ref(db, `gestiones_cobranza/${codigoPago}`), snap => {
+      const raw = snap.val() || {};
+      const arr = Object.entries(raw).map(([k,v]) => ({ ...v, _key: k })).sort((a,b)=>b.ts-a.ts);
+      cb(arr);
+    });
+
+  /* Estado actual asignado por cliente */
+  window._fbSetEstadoCliente = (codigoPago, estadoKey, estadoNombre, nota, usuario) =>
+    set(ref(db, `estado_cliente/${codigoPago}`), { estadoKey, estadoNombre, nota, usuario, ts: Date.now() });
+  window._fbGetEstadosClientes = (cb) =>
+    onValue(ref(db, 'estado_cliente'), snap => { cb(snap.val() || {}); });
+
+  /* ── METAS MENSUALES ── */
+  window._fbSetMeta = (anio, mes, tipo, monto) =>
+    set(ref(db, `metas/${anio}/${mes}/${tipo}`), { monto, updatedAt: new Date().toLocaleString('es-BO') });
+  window._fbListenMetas = (anio, mes, cb) =>
+    onValue(ref(db, `metas/${anio}/${mes}`), snap => { cb(snap.val() || {}); });
+
+  /* Seed estados si no existen */
+  get(ref(db,'estados_cobranza')).then(snap => {
+    if (!snap.exists()) {
+      const defaults = [
+        { nombre:'Sin contactar',      color:'#6b7280', icono:'⚪', ts: Date.now() },
+        { nombre:'1er contacto',       color:'#3b82f6', icono:'📞', ts: Date.now()+1 },
+        { nombre:'Acuerdo de pago',    color:'#f59e0b', icono:'🤝', ts: Date.now()+2 },
+        { nombre:'Compromiso firmado', color:'#8b5cf6', icono:'✍️', ts: Date.now()+3 },
+        { nombre:'Pagó este mes',      color:'#10b981', icono:'✅', ts: Date.now()+4 },
+        { nombre:'Enviado a legal',    color:'#ef4444', icono:'⚖️', ts: Date.now()+5 },
+      ];
+      defaults.forEach(e => push(ref(db,'estados_cobranza'), e));
+    }
+  });
+
+  /* Seed asesores si no existen */
+  get(ref(db,'asesores_planilla')).then(snap => {
+    if (!snap.exists()) {
+      const defaults = [
+        { nombre: 'Luis Carlos', pin: '1111' },
+        { nombre: 'Andrea Aguilera', pin: '2222' },
+        { nombre: 'Fabiola Claure', pin: '3333' }
+      ];
+      defaults.forEach(a => push(ref(db,'asesores_planilla'), a));
+    }
+  });
+
+  window._fbReady = true;
+  document.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<style>
+/* ══════════════════════════════════════════
+   TOKENS
+══════════════════════════════════════════ */
+:root {
+  --verde:       #2d5a27;
+  --verde-claro: #4a8c3f;
+  --verde-dark:  #1a3516;
+  --crema:       #f5f0e8;
+  --blanco:      #ffffff;
+  --gris:        #6b7280;
+  --gris-claro:  #f3f4f6;
+  --rojo:        #dc2626;
+  --amarillo:    #d97706;
+  --azul:        #2563eb;
+  --morado:      #7c3aed;
+  --naranja:     #ea580c;
+
+  --shadow-sm:   0 1px 4px rgba(0,0,0,.06);
+  --shadow-md:   0 4px 16px rgba(0,0,0,.10);
+  --shadow-lg:   0 16px 48px rgba(0,0,0,.18);
+  --radius:      14px;
+  --radius-sm:   8px;
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{
+  font-family:'DM Sans',sans-serif;
+  min-height:100vh;
+  background:#1a2e17;
+  color:#1f2937;
+}
+
+/* ══════════════════════════════════════════
+   LOGIN SCREEN
+══════════════════════════════════════════ */
+#login-screen{
+  min-height:100vh;
+  background:
+    linear-gradient(to bottom,rgba(15,25,12,.75) 0%,rgba(20,35,16,.90) 100%),
+    url('https://images.unsplash.com/photo-1448630360428-65456885c650?w=1400&q=80') center/cover no-repeat;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:40px 20px;
+}
+
+.login-card{
+  background:rgba(255,255,255,.97);
+  border-radius:20px;
+  padding:40px 36px;
+  width:100%; max-width:420px;
+  box-shadow:var(--shadow-lg);
+}
+
+.brand-top{
+  text-align:center; margin-bottom:32px;
+}
+.brand-top .logo-circle{
+  width:64px; height:64px; border-radius:50%;
+  background:var(--verde);
+  display:flex; align-items:center; justify-content:center;
+  margin:0 auto 12px;
+  font-family:'Cormorant Garamond',serif;
+  font-size:28px; font-weight:700; color:#fff;
+}
+.brand-top h1{
+  font-family:'Cormorant Garamond',serif;
+  font-size:24px; font-weight:600; color:var(--verde);
+  line-height:1.2;
+}
+.brand-top p{ font-size:13px; color:var(--gris); margin-top:4px; }
+
+/* Paso 1: seleccionar quién sos */
+.step-title{
+  font-size:12px; font-weight:600; color:var(--gris);
+  text-transform:uppercase; letter-spacing:.06em;
+  margin-bottom:14px;
+}
+
+.asesor-grid{
+  display:flex; flex-direction:column; gap:8px;
+  max-height:280px; overflow-y:auto;
+}
+.asesor-btn{
+  width:100%; padding:14px 18px;
+  border:1.5px solid #e5e7eb; border-radius:12px;
+  background:#fff; cursor:pointer;
+  display:flex; align-items:center; gap:12px;
+  text-align:left; transition:all .2s;
+  font-family:'DM Sans',sans-serif;
+}
+.asesor-btn:hover{ border-color:var(--verde-claro); background:#f0f7ee; }
+.asesor-btn .av{
+  width:38px; height:38px; border-radius:50%;
+  background:var(--verde); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; font-weight:600; flex-shrink:0;
+}
+.asesor-btn .av.av-admin{ background:var(--azul); }
+.asesor-btn .info .name{ font-size:15px; font-weight:500; color:#1f2937; }
+.asesor-btn .info .role{ font-size:12px; color:var(--gris); }
+
+.divider{
+  display:flex; align-items:center; gap:10px;
+  margin:16px 0; color:var(--gris); font-size:12px;
+}
+.divider::before,.divider::after{
+  content:''; flex:1; height:1px; background:#e5e7eb;
+}
+
+/* Paso 2: PIN */
+#pin-step{ display:none; }
+.back-btn{
+  display:flex; align-items:center; gap:6px;
+  background:none; border:none; cursor:pointer;
+  font-size:13px; color:var(--gris); margin-bottom:20px;
+  font-family:'DM Sans',sans-serif; padding:0;
+}
+.back-btn:hover{ color:var(--verde); }
+
+.selected-user{
+  display:flex; align-items:center; gap:12px;
+  padding:14px 16px; background:#f0f7ee;
+  border-radius:12px; margin-bottom:24px;
+}
+.selected-user .av{
+  width:42px; height:42px; border-radius:50%;
+  background:var(--verde); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px; font-weight:600;
+}
+.selected-user .av.av-admin{ background:var(--azul); }
+.selected-user .name{ font-size:16px; font-weight:500; color:#1f2937; }
+.selected-user .hint{ font-size:12px; color:var(--gris); }
+
+.pin-label{ font-size:12px; font-weight:600; color:var(--gris);
+  text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px; text-align:center; }
+.pin-dots{ display:flex; justify-content:center; gap:14px; margin-bottom:24px; }
+.dot{
+  width:16px; height:16px; border-radius:50%;
+  border:2px solid #d1d5db; background:transparent; transition:all .15s;
+}
+.dot.filled{ background:var(--verde); border-color:var(--verde); }
+.numpad{ display:grid; grid-template-columns:repeat(3,68px); gap:10px; justify-content:center; }
+.num-btn{
+  width:68px; height:54px; border-radius:12px;
+  border:1.5px solid #e5e7eb; background:#fff;
+  font-size:22px; font-family:'DM Sans',sans-serif;
+  color:#1f2937; cursor:pointer; transition:all .15s;
+}
+.num-btn:hover{ background:#f3f4f6; border-color:#9ca3af; }
+.num-btn.del{ font-size:14px; color:var(--gris); }
+.pin-err{
+  background:#fef2f2; color:var(--rojo);
+  border-radius:8px; padding:10px; font-size:13px;
+  margin-top:16px; display:none; text-align:center;
+}
+
+/* ══════════════════════════════════════════
+   ASESOR PANEL
+══════════════════════════════════════════ */
+#asesor-panel{ display:none; min-height:100vh; background:#f8f9fa; }
+
+.panel-header{
+  background:var(--verde); padding:16px 24px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; z-index:10;
+}
+.panel-header-left{ display:flex; align-items:center; gap:12px; }
+.panel-header .av-sm{
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(255,255,255,.25); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:600;
+}
+.panel-header h1{
+  font-family:'Cormorant Garamond',serif;
+  font-size:19px; color:#fff; font-weight:600;
+}
+.panel-header p{ font-size:11px; color:rgba(255,255,255,.65); }
+.btn-exit{
+  padding:8px 16px; background:rgba(255,255,255,.15);
+  border:1px solid rgba(255,255,255,.3); border-radius:8px;
+  color:#fff; font-size:13px; cursor:pointer;
+  font-family:'DM Sans',sans-serif; transition:.2s;
+}
+.btn-exit:hover{ background:rgba(255,255,255,.25); }
+
+.panel-body{ padding:24px 20px; max-width:900px; margin:0 auto; }
+
+/* Tabs asesor */
+.asesor-tabs{
+  display:flex; gap:4px; background:#e5e7eb;
+  border-radius:10px; padding:4px; margin-bottom:24px;
+}
+.a-tab{
+  flex:1; padding:9px; border:none; border-radius:7px;
+  font-size:13px; cursor:pointer;
+  font-family:'DM Sans',sans-serif; font-weight:500;
+  color:#6b7280; background:transparent; transition:all .2s;
+}
+.a-tab.active{ background:#fff; color:var(--verde); box-shadow:var(--shadow-sm); }
+
+/* ══════════════════════════════════════════
+   FORMULARIO
+══════════════════════════════════════════ */
+.form-section{
+  background:#fff; border-radius:16px;
+  padding:28px 24px; box-shadow:var(--shadow-sm);
+  margin-bottom:20px;
+}
+.section-header{
+  display:flex; align-items:center; gap:10px;
+  margin-bottom:20px; padding-bottom:14px;
+  border-bottom:1px solid #f3f4f6;
+}
+.section-badge{
+  padding:4px 12px; border-radius:999px;
+  font-size:11px; font-weight:600; letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.badge-bbdd  { background:#dbeafe; color:#1e40af; }
+.badge-tlmk  { background:#ede9fe; color:#5b21b6; }
+.badge-agenda{ background:#fef3c7; color:#92400e; }
+.badge-venta { background:#d1fae5; color:#065f46; }
+.badge-estado{ background:#fee2e2; color:#991b1b; }
+
+.section-header h3{
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px; font-weight:600; color:#1f2937;
+}
+
+.form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-grid.col3{ grid-template-columns:1fr 1fr 1fr; }
+.form-col-full{ grid-column:1/-1; }
+
+label{
+  display:block; font-size:11px; font-weight:600;
+  color:#374151; margin-bottom:5px;
+  letter-spacing:.04em; text-transform:uppercase;
+}
+input[type=text], input[type=date], input[type=number], input[type=time], select, textarea{
+  width:100%; padding:10px 14px;
+  border:1.5px solid #e5e7eb; border-radius:10px;
+  font-size:14px; font-family:'DM Sans',sans-serif;
+  color:#1f2937; background:#fff; transition:border .2s;
+  -webkit-appearance:none; appearance:none;
+}
+input:focus, select:focus, textarea:focus{
+  outline:none; border-color:var(--verde-claro);
+  box-shadow:0 0 0 3px rgba(74,140,63,.1);
+}
+textarea{ resize:vertical; min-height:80px; }
+
+.radio-row{ display:flex; gap:8px; flex-wrap:wrap; }
+.radio-pill{
+  flex:1; min-width:70px;
+  display:flex; align-items:center; justify-content:center;
+  gap:6px; padding:9px 8px; border:1.5px solid #e5e7eb;
+  border-radius:10px; cursor:pointer; font-size:13px;
+  transition:all .2s; color:#374151; white-space:nowrap;
+}
+.radio-pill input[type=radio]{ display:none; }
+.radio-pill.sel-si  { border-color:#16a34a; background:#f0fdf4; color:#16a34a; font-weight:600; }
+.radio-pill.sel-no  { border-color:#dc2626; background:#fef2f2; color:#dc2626; font-weight:600; }
+.radio-pill.sel-gen { border-color:var(--verde); background:#f0f7ee; color:var(--verde); font-weight:600; }
+
+.btn-submit-form{
+  width:100%; padding:15px; margin-top:8px;
+  background:var(--verde); color:#fff; border:none;
+  border-radius:12px; font-size:15px; font-weight:500;
+  font-family:'DM Sans',sans-serif;
+  cursor:pointer; transition:background .2s, transform .1s;
+  letter-spacing:.02em;
+}
+.btn-submit-form:hover{ background:var(--verde-claro); }
+.btn-submit-form:active{ transform:scale(.98); }
+
+.success-banner{
+  display:none; background:#ecfdf5;
+  border:1.5px solid #6ee7b7; border-radius:12px;
+  padding:16px 20px; text-align:center; margin-top:16px;
+}
+.success-banner p{ font-size:14px; color:#065f46; font-weight:500; }
+
+/* ══════════════════════════════════════════
+   TABLA ASESOR
+══════════════════════════════════════════ */
+.mis-registros{
+  background:#fff; border-radius:16px;
+  padding:24px; box-shadow:var(--shadow-sm);
+}
+.mis-registros h3{
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px; font-weight:600; margin-bottom:16px; color:#1f2937;
+}
+
+.reg-card{
+  border:1.5px solid #f3f4f6; border-radius:12px;
+  padding:16px; margin-bottom:12px;
+  transition:border-color .2s;
+}
+.reg-card:hover{ border-color:#d1fae5; }
+.reg-card-top{
+  display:flex; justify-content:space-between;
+  align-items:flex-start; margin-bottom:10px;
+}
+.reg-cliente{ font-size:16px; font-weight:600; color:#1f2937; }
+.reg-fecha{ font-size:11px; color:var(--gris); }
+.reg-pills{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+
+.badge{
+  display:inline-block; padding:3px 10px;
+  border-radius:999px; font-size:11px; font-weight:500; white-space:nowrap;
+}
+.badge-contrato  { background:#d1fae5; color:#065f46; }
+.badge-tramite   { background:#dbeafe; color:#1e40af; }
+.badge-reserva   { background:#ede9fe; color:#5b21b6; }
+.badge-seguim    { background:#fef3c7; color:#92400e; }
+.badge-descartado{ background:#fee2e2; color:#991b1b; }
+.badge-entrega   { background:#d1fae5; color:#065f46; }
+.badge-firma     { background:#ede9fe; color:#5b21b6; }
+.badge-desistido { background:#fee2e2; color:#991b1b; }
+.badge-def       { background:#f3f4f6; color:#6b7280; }
+
+.reg-comentario{ font-size:13px; color:#6b7280; margin-top:8px; font-style:italic; }
+
+.empty-state{
+  text-align:center; padding:40px 20px;
+  color:var(--gris); font-size:14px;
+}
+
+/* ══════════════════════════════════════════
+   ADMIN PANEL
+══════════════════════════════════════════ */
+#admin-panel{ display:none; min-height:100vh; background:#f8f9fa; }
+
+.admin-header{
+  background:linear-gradient(135deg,var(--verde-dark),var(--verde));
+  padding:18px 24px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; z-index:10;
+}
+.admin-header-left{ display:flex; align-items:center; gap:14px; }
+.admin-header .av-sm{
+  width:38px; height:38px; border-radius:50%;
+  background:rgba(255,255,255,.2); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; font-weight:600;
+}
+.admin-header h1{
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px; color:#fff; font-weight:600;
+}
+.admin-header p{ font-size:12px; color:rgba(255,255,255,.65); }
+
+.admin-tabs-wrap{
+  display:flex; align-items:center; gap:12px;
+}
+.admin-tabs{
+  display:flex; gap:0; background:rgba(0,0,0,.2);
+  border-radius:10px; padding:4px;
+}
+.tab-btn{
+  padding:7px 16px; border:none; border-radius:7px;
+  font-size:13px; cursor:pointer;
+  font-family:'DM Sans',sans-serif; font-weight:500;
+  color:rgba(255,255,255,.7); background:transparent;
+  transition:all .2s;
+}
+.tab-btn.active{ background:#fff; color:var(--verde); }
+
+.admin-body{ padding:24px 20px; max-width:1200px; margin:0 auto; }
+
+/* KPIs */
+.kpi-grid{
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:16px; margin-bottom:24px;
+}
+.kpi-card{
+  background:#fff; border-radius:14px;
+  padding:20px; box-shadow:var(--shadow-sm);
+}
+.kpi-label{ font-size:11px; font-weight:600; color:var(--gris);
+  text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+.kpi-num{ font-size:36px; font-weight:700; color:#1f2937;
+  font-family:'Cormorant Garamond',serif; line-height:1; }
+.kpi-sub{ font-size:12px; color:var(--gris); margin-top:4px; }
+.kpi-icon{ font-size:22px; float:right; opacity:.6; }
+
+/* Sección admin genérica */
+.admin-section{
+  background:#fff; border-radius:16px;
+  padding:24px; box-shadow:var(--shadow-sm);
+  margin-bottom:20px;
+}
+.admin-section h3{
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px; font-weight:600; margin-bottom:16px; color:#1f2937;
+}
+
+/* Filtros */
+.filters-bar{
+  display:flex; gap:10px; flex-wrap:wrap;
+  margin-bottom:16px; align-items:flex-end;
+}
+.filters-bar > div{ flex:1; min-width:140px; }
+.filters-bar label{ font-size:11px; }
+.btn-clear{
+  padding:10px 16px; background:#f3f4f6;
+  border:1.5px solid #e5e7eb; border-radius:10px;
+  font-size:13px; cursor:pointer; font-family:'DM Sans',sans-serif;
+  transition:.2s; white-space:nowrap; align-self:flex-end;
+}
+.btn-clear:hover{ background:#e5e7eb; }
+.btn-export{
+  padding:10px 16px; background:var(--verde);
+  border:none; border-radius:10px;
+  color:#fff; font-size:13px; cursor:pointer;
+  font-family:'DM Sans',sans-serif; transition:.2s;
+  white-space:nowrap; align-self:flex-end;
+}
+.btn-export:hover{ background:var(--verde-claro); }
+
+/* Tabla admin */
+.tabla-wrap{ overflow-x:auto; }
+table{
+  width:100%; border-collapse:collapse;
+  font-size:13px;
+}
+th{
+  text-align:left; padding:10px 12px;
+  background:#f8f9fa; border-bottom:2px solid #e5e7eb;
+  font-size:11px; font-weight:600; color:var(--gris);
+  text-transform:uppercase; letter-spacing:.04em;
+  white-space:nowrap;
+}
+td{
+  padding:12px; border-bottom:1px solid #f3f4f6;
+  vertical-align:top;
+}
+tr:hover td{ background:#fafffe; }
+.btn-del{
+  background:none; border:1px solid #fca5a5;
+  color:var(--rojo); border-radius:6px;
+  padding:4px 8px; font-size:12px; cursor:pointer; transition:.2s;
+}
+.btn-del:hover{ background:#fef2f2; }
+
+/* Gráficos */
+.charts-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+.chart-card{
+  background:#fff; border-radius:14px;
+  padding:20px; box-shadow:var(--shadow-sm);
+}
+.chart-card h4{
+  font-family:'Cormorant Garamond',serif;
+  font-size:16px; font-weight:600; margin-bottom:14px; color:#1f2937;
+}
+.bar-item{ margin-bottom:10px; }
+.bar-label{
+  display:flex; justify-content:space-between;
+  font-size:12px; margin-bottom:4px; color:#374151;
+}
+.bar-track{ height:8px; background:#f3f4f6; border-radius:999px; overflow:hidden; }
+.bar-fill{ height:100%; border-radius:999px; transition:width .4s; }
+
+/* Gestión asesores */
+.vendor-item{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 14px; border:1.5px solid #f3f4f6;
+  border-radius:10px; margin-bottom:8px;
+}
+.v-name{ font-size:15px; font-weight:500; }
+.v-pin{ font-size:12px; color:var(--gris); font-family:monospace; }
+.v-count{ font-size:12px; color:var(--gris); }
+.vendor-actions{ display:flex; gap:6px; align-items:center; }
+.btn-remove-vendor{
+  background:none; border:1px solid #e5e7eb;
+  color:var(--gris); border-radius:6px;
+  width:28px; height:28px; cursor:pointer;
+  font-size:16px; line-height:1; transition:.2s;
+}
+.btn-remove-vendor:hover{ border-color:#fca5a5; color:var(--rojo); }
+.add-vendor-row{ display:flex; gap:10px; margin-top:12px; }
+.add-vendor-row input{ flex:1; }
+.add-vendor-row input.pin-inp{ max-width:90px; }
+.btn-add-vendor{
+  padding:10px 18px; background:var(--verde);
+  border:none; border-radius:10px; color:#fff;
+  font-size:13px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:.2s;
+}
+.btn-add-vendor:hover{ background:var(--verde-claro); }
+
+/* PIN admin change */
+.pin-change-row{ display:flex; gap:10px; margin-top:8px; }
+.pin-change-row input{ max-width:140px; }
+.btn-save-pin{
+  padding:10px 18px; background:var(--azul);
+  border:none; border-radius:10px; color:#fff;
+  font-size:13px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:.2s;
+}
+.btn-save-pin:hover{ background:#1d4ed8; }
+
+/* Live dot */
+.live-dot{
+  width:7px; height:7px; border-radius:50%;
+  background:#4ade80; display:inline-block;
+  margin-right:5px; animation:pulse 2s infinite;
+}
+@keyframes pulse{
+  0%,100%{ opacity:1; transform:scale(1); }
+  50%{ opacity:.5; transform:scale(1.3); }
+}
+
+/* Responsive */
+@media(max-width:768px){
+  .kpi-grid{ grid-template-columns:1fr 1fr; }
+  .charts-grid{ grid-template-columns:1fr; }
+  .form-grid{ grid-template-columns:1fr; }
+  .form-grid.col3{ grid-template-columns:1fr; }
+  .admin-tabs-wrap{ display:none; }
+  .filters-bar > div{ min-width:100%; }
+  .login-card{ padding:28px 20px; }
+}
+@media(max-width:480px){
+  .kpi-grid{ grid-template-columns:1fr; }
+}
+
+/* Tab panels */
+.tab-panel{ display:none; }
+.tab-panel.active{ display:block; }
+.a-tab-panel{ display:none; }
+.a-tab-panel.active{ display:block; }
+
+/* ══ HOME / CENTRO DE COMANDO ══ */
+.home-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px; margin-bottom:20px;
+}
+.home-grid-full{ grid-column:1/-1; }
+
+.home-section{
+  background:#fff; border-radius:16px;
+  padding:22px; box-shadow:var(--shadow-sm);
+}
+.home-section h3{
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px; font-weight:600;
+  color:#1f2937; margin-bottom:14px;
+  display:flex; align-items:center; gap:8px;
+}
+
+/* Alertas urgentes */
+.alerta-item{
+  display:flex; align-items:flex-start; gap:10px;
+  padding:10px 12px; border-radius:10px;
+  margin-bottom:8px; cursor:pointer;
+  transition:opacity .15s;
+}
+.alerta-item:hover{ opacity:.85; }
+.alerta-dot{
+  width:10px; height:10px; border-radius:50%;
+  flex-shrink:0; margin-top:4px;
+}
+.alerta-texto{ font-size:13px; color:#1f2937; line-height:1.4; }
+.alerta-meta{ font-size:11px; color:var(--gris); margin-top:2px; }
+.alerta-mora{ background:#fef2f2; border-left:3px solid #ef4444; }
+.alerta-gestion{ background:#fffbeb; border-left:3px solid #f59e0b; }
+.alerta-meta-pct{ background:#f0fdf4; border-left:3px solid #10b981; }
+.alerta-sin{ background:#f9fafb; border-left:3px solid #9ca3af; }
+
+/* Acciones rápidas */
+.accion-grid{
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.accion-btn{
+  padding:14px 12px;
+  border:1.5px solid #e5e7eb; border-radius:12px;
+  background:#fff; cursor:pointer;
+  text-align:center; transition:all .2s;
+  font-family:'DM Sans',sans-serif;
+}
+.accion-btn:hover{ border-color:var(--verde); background:#f0f7ee; }
+.accion-btn .accion-icon{ font-size:22px; margin-bottom:4px; }
+.accion-btn .accion-label{ font-size:12px; font-weight:500; color:#374151; }
+.accion-btn .accion-sub{ font-size:11px; color:var(--gris); margin-top:2px; }
+
+/* Resumen rápido home */
+.home-stat-row{
+  display:flex; justify-content:space-between;
+  align-items:center; padding:8px 0;
+  border-bottom:1px solid #f3f4f6;
+}
+.home-stat-row:last-child{ border-bottom:none; }
+.home-stat-label{ font-size:13px; color:#374151; }
+.home-stat-val{ font-size:14px; font-weight:600; color:#1f2937; }
+
+/* Semáforo mora */
+.mora-semaforo{
+  display:grid; grid-template-columns:1fr 1fr 1fr;
+  gap:10px; margin-top:4px;
+}
+.mora-nivel{
+  text-align:center; padding:12px 8px;
+  border-radius:10px;
+}
+.mora-nivel .n{ font-size:26px; font-weight:700;
+  font-family:'Cormorant Garamond',serif; }
+.mora-nivel .l{ font-size:11px; font-weight:600;
+  text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+
+/* Barra progreso meta home */
+.meta-mini-wrap{ margin-top:6px; }
+.meta-mini-row{
+  display:flex; justify-content:space-between;
+  font-size:12px; color:#374151; margin-bottom:4px;
+}
+.meta-mini-track{
+  height:6px; background:#f3f4f6;
+  border-radius:999px; overflow:hidden;
+}
+.meta-mini-fill{
+  height:100%; border-radius:999px;
+  transition:width .5s;
+}
+
+/* Tabla resumen mora en home */
+.mora-table-mini{ width:100%; border-collapse:collapse; font-size:12px; }
+.mora-table-mini th{
+  text-align:left; padding:6px 8px;
+  background:#f8f9fa; color:var(--gris);
+  font-size:10px; text-transform:uppercase;
+  letter-spacing:.04em; font-weight:600;
+}
+.mora-table-mini td{
+  padding:8px; border-bottom:1px solid #f3f4f6;
+}
+.mora-table-mini tr:hover td{ background:#fffbeb; cursor:pointer; }
+
+/* Notificación badge */
+.notif-badge{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:18px; height:18px; border-radius:50%;
+  background:#ef4444; color:#fff;
+  font-size:10px; font-weight:700;
+  margin-left:4px;
+}
+
+@media(max-width:768px){
+  .home-grid{ grid-template-columns:1fr; }
+  .accion-grid{ grid-template-columns:1fr 1fr; }
+}
+
+/* ══════════════════════════════════════════
+   MÓDULO COBRANZA — ESTILOS NUEVOS
+══════════════════════════════════════════ */
+
+/* Barra de meta con progreso */
+.meta-bar-wrap{
+  background:#fff; border-radius:16px;
+  padding:22px 24px; box-shadow:var(--shadow-sm);
+  margin-bottom:20px;
+}
+.meta-bar-header{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:6px;
+}
+.meta-bar-title{ font-size:13px; font-weight:600; color:#374151; }
+.meta-bar-nums{ font-size:13px; color:var(--gris); }
+.meta-bar-nums strong{ color:#1f2937; }
+.meta-bar-track{
+  height:12px; background:#f3f4f6; border-radius:999px;
+  overflow:hidden; margin-bottom:6px;
+}
+.meta-bar-fill{
+  height:100%; border-radius:999px;
+  transition:width .6s cubic-bezier(.4,0,.2,1);
+}
+.meta-bar-pct{
+  font-size:22px; font-weight:700;
+  font-family:'Cormorant Garamond',serif;
+}
+
+/* Grid de KPIs de cobranza */
+.cob-kpi-grid{
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:12px; margin-bottom:20px;
+}
+@media(max-width:900px){ .cob-kpi-grid{ grid-template-columns:1fr 1fr; } }
+@media(max-width:480px){ .cob-kpi-grid{ grid-template-columns:1fr; } }
+
+.cob-kpi{
+  background:#fff; border-radius:14px;
+  padding:16px 18px; box-shadow:var(--shadow-sm);
+  border-left:4px solid transparent;
+}
+.cob-kpi-label{ font-size:11px; font-weight:600; color:var(--gris);
+  text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+.cob-kpi-val{ font-size:26px; font-weight:700;
+  font-family:'Cormorant Garamond',serif; color:#1f2937; line-height:1; }
+.cob-kpi-sub{ font-size:11px; color:var(--gris); margin-top:3px; }
+
+/* Tabla de clientes cobranza */
+.cob-search-bar{
+  display:flex; gap:10px; flex-wrap:wrap;
+  margin-bottom:16px; align-items:flex-end;
+}
+.cob-search-bar input,
+.cob-search-bar select{
+  padding:9px 14px; border:1.5px solid #e5e7eb;
+  border-radius:10px; font-size:13px;
+  font-family:'DM Sans',sans-serif; color:#1f2937;
+}
+.cob-search-bar input{ flex:1; min-width:200px; }
+
+.cliente-row{
+  display:flex; align-items:center; gap:12px;
+  padding:14px 16px; border:1.5px solid #f3f4f6;
+  border-radius:12px; margin-bottom:8px;
+  cursor:pointer; transition:all .2s;
+  background:#fff;
+}
+.cliente-row:hover{ border-color:#d1fae5; background:#fafffe; }
+.cliente-row.mora{ border-left:4px solid #ef4444; }
+.cliente-row.vigente{ border-left:4px solid #10b981; }
+.cliente-row.adelantado{ border-left:4px solid #3b82f6; }
+
+.cli-avatar{
+  width:38px; height:38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:700; color:#fff; flex-shrink:0;
+}
+.cli-info{ flex:1; min-width:0; }
+.cli-nombre{ font-size:14px; font-weight:600; color:#1f2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cli-sub{ font-size:11px; color:var(--gris); margin-top:2px; }
+.cli-monto{ text-align:right; flex-shrink:0; }
+.cli-monto-val{ font-size:15px; font-weight:700; font-family:'Cormorant Garamond',serif; color:#1f2937; }
+.cli-monto-label{ font-size:10px; color:var(--gris); }
+
+.estado-pill{
+  padding:3px 10px; border-radius:999px;
+  font-size:11px; font-weight:600;
+  white-space:nowrap; flex-shrink:0;
+}
+
+/* Panel lateral de detalle cliente */
+.slide-panel{
+  position:fixed; top:0; right:-100%; width:480px; max-width:100vw;
+  height:100vh; background:#fff; z-index:200;
+  box-shadow:-8px 0 40px rgba(0,0,0,.15);
+  transition:right .3s cubic-bezier(.4,0,.2,1);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.slide-panel.open{ right:0; }
+.slide-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.35);
+  z-index:199; display:none;
+}
+.slide-overlay.open{ display:block; }
+
+.slide-header{
+  padding:20px 22px; border-bottom:1px solid #f3f4f6;
+  display:flex; justify-content:space-between; align-items:flex-start;
+  flex-shrink:0;
+}
+.slide-header h3{ font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:600; }
+.slide-header p{ font-size:12px; color:var(--gris); margin-top:2px; }
+.slide-close{
+  background:none; border:1.5px solid #e5e7eb; border-radius:8px;
+  width:34px; height:34px; cursor:pointer; font-size:18px;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--gris); transition:.2s; flex-shrink:0;
+}
+.slide-close:hover{ border-color:#9ca3af; color:#1f2937; }
+
+.slide-body{ flex:1; overflow-y:auto; padding:20px 22px; }
+
+/* Cuotas detalle */
+.cuota-item{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 12px; border-radius:10px; margin-bottom:6px;
+  font-size:13px;
+}
+.cuota-mora{ background:#fef2f2; }
+.cuota-vigente{ background:#f0fdf4; }
+.cuota-adelantado{ background:#eff6ff; }
+
+/* Historial gestiones */
+.gestion-item{
+  display:flex; gap:12px; padding:12px 0;
+  border-bottom:1px solid #f3f4f6;
+}
+.gestion-dot{
+  width:10px; height:10px; border-radius:50%;
+  margin-top:5px; flex-shrink:0;
+}
+.gestion-content{ flex:1; }
+.gestion-estado{ font-size:13px; font-weight:600; color:#1f2937; }
+.gestion-nota{ font-size:12px; color:#6b7280; margin-top:3px; }
+.gestion-meta{ font-size:11px; color:#9ca3af; margin-top:2px; }
+
+/* Formulario asignar estado */
+.estado-form{
+  background:#f8f9fa; border-radius:12px;
+  padding:16px; margin-top:16px;
+  border:1.5px solid #e5e7eb;
+}
+.estado-form h4{ font-size:14px; font-weight:600; margin-bottom:12px; color:#1f2937; }
+.estado-btns-grid{
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:8px; margin-bottom:12px;
+}
+.estado-opt-btn{
+  padding:8px 10px; border-radius:10px;
+  border:1.5px solid transparent; cursor:pointer;
+  font-size:12px; font-weight:600; font-family:'DM Sans',sans-serif;
+  transition:all .2s; text-align:center;
+  display:flex; align-items:center; gap:6px;
+  background:#fff;
+}
+.estado-opt-btn:hover{ transform:scale(1.02); }
+.estado-opt-btn.selected{ border-width:2px; }
+.btn-guardar-estado{
+  width:100%; padding:11px;
+  background:var(--verde); color:#fff; border:none;
+  border-radius:10px; font-size:14px; font-weight:500;
+  font-family:'DM Sans',sans-serif; cursor:pointer; transition:.2s;
+}
+.btn-guardar-estado:hover{ background:var(--verde-claro); }
+
+/* Modal Metas */
+.meta-modal-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.4);
+  z-index:300; display:none; align-items:center; justify-content:center;
+}
+.meta-modal-backdrop.open{ display:flex; }
+.meta-modal{
+  background:#fff; border-radius:20px;
+  padding:32px; width:100%; max-width:440px;
+  box-shadow:var(--shadow-lg); margin:20px;
+}
+.meta-modal h3{ font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; margin-bottom:20px; }
+.meta-input-row{ margin-bottom:16px; }
+.meta-input-row label{ display:block; font-size:11px; font-weight:600; color:#374151; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+.meta-input-row input{ width:100%; padding:12px 14px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:16px; font-family:'DM Sans',sans-serif; }
+.meta-input-row input:focus{ outline:none; border-color:var(--verde-claro); }
+.meta-modal-footer{ display:flex; gap:10px; margin-top:24px; }
+.btn-meta-save{ flex:1; padding:12px; background:var(--verde); color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:500; font-family:'DM Sans',sans-serif; cursor:pointer; transition:.2s; }
+.btn-meta-save:hover{ background:var(--verde-claro); }
+.btn-meta-cancel{ padding:12px 20px; background:#f3f4f6; border:none; border-radius:10px; font-size:14px; font-family:'DM Sans',sans-serif; cursor:pointer; transition:.2s; color:#374151; }
+.btn-meta-cancel:hover{ background:#e5e7eb; }
+
+/* Expensas */
+.exp-grid{
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:16px; margin-bottom:20px;
+}
+@media(max-width:700px){ .exp-grid{ grid-template-columns:1fr; } }
+
+/* Config estados */
+.estado-config-item{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border:1.5px solid #f3f4f6;
+  border-radius:10px; margin-bottom:8px;
+}
+.estado-config-icono{ font-size:18px; }
+.estado-config-nombre{ flex:1; font-size:14px; font-weight:500; color:#1f2937; }
+.estado-config-color{ width:16px; height:16px; border-radius:50%; flex-shrink:0; }
+.add-estado-row{
+  display:grid; grid-template-columns:1fr auto auto auto;
+  gap:8px; margin-top:12px; align-items:end;
+}
+@media(max-width:600px){ .add-estado-row{ grid-template-columns:1fr 1fr; } }
+.btn-add-estado{
+  padding:10px 16px; background:var(--verde); border:none;
+  border-radius:10px; color:#fff; font-size:13px; cursor:pointer;
+  font-family:'DM Sans',sans-serif; transition:.2s; white-space:nowrap;
+}
+.btn-add-estado:hover{ background:var(--verde-claro); }
+
+/* Loading spinner */
+.loading-spin{
+  text-align:center; padding:40px;
+  color:var(--gris); font-size:13px;
+}
+.spinner{
+  display:inline-block; width:24px; height:24px;
+  border:3px solid #e5e7eb; border-top-color:var(--verde);
+  border-radius:50%; animation:spin .8s linear infinite;
+  margin-bottom:10px;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* Responsive admin tabs on mobile */
+@media(max-width:768px){
+  .admin-tabs{ overflow-x:auto; }
+  .tab-btn{ padding:7px 10px; font-size:11px; white-space:nowrap; }
+  .slide-panel{ width:100vw; }
+}
+</style>
+
+<!-- SheetJS para exportar -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     LOGIN SCREEN
+═══════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="brand-top">
+      <div class="logo-circle">UV</div>
+      <h1>Urubo Village</h1>
+      <p>Planilla de Carga Comercial</p>
+    </div>
+
+    <!-- Paso 1: Seleccionar usuario -->
+    <div id="step-usuario">
+      <p class="step-title">¿Quién sos?</p>
+      <div class="asesor-grid" id="asesor-grid">
+        <div style="text-align:center;padding:20px;color:#9ca3af;font-size:13px;">Cargando...</div>
+      </div>
+
+      <div class="divider">o</div>
+
+      <button class="asesor-btn" onclick="seleccionarAdmin()">
+        <div class="av av-admin">⚙</div>
+        <div class="info">
+          <div class="name">Administrador</div>
+          <div class="role">Controller / Gerente Comercial</div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Paso 2: PIN -->
+    <div id="pin-step">
+      <button class="back-btn" onclick="volverPaso1()">← Cambiar usuario</button>
+      <div class="selected-user" id="selected-user-info">
+        <div class="av" id="sel-av">?</div>
+        <div>
+          <div class="name" id="sel-name">—</div>
+          <div class="hint">Ingresá tu PIN de 4 dígitos</div>
+        </div>
+      </div>
+
+      <p class="pin-label">PIN de acceso</p>
+      <div class="pin-dots">
+        <div class="dot" id="pd0"></div>
+        <div class="dot" id="pd1"></div>
+        <div class="dot" id="pd2"></div>
+        <div class="dot" id="pd3"></div>
+      </div>
+      <div class="numpad">
+        <button class="num-btn" onclick="pinPress('1')">1</button>
+        <button class="num-btn" onclick="pinPress('2')">2</button>
+        <button class="num-btn" onclick="pinPress('3')">3</button>
+        <button class="num-btn" onclick="pinPress('4')">4</button>
+        <button class="num-btn" onclick="pinPress('5')">5</button>
+        <button class="num-btn" onclick="pinPress('6')">6</button>
+        <button class="num-btn" onclick="pinPress('7')">7</button>
+        <button class="num-btn" onclick="pinPress('8')">8</button>
+        <button class="num-btn" onclick="pinPress('9')">9</button>
+        <button class="num-btn del" onclick="pinPress('clr')">CLR</button>
+        <button class="num-btn" onclick="pinPress('0')">0</button>
+        <button class="num-btn del" onclick="pinPress('del')">⌫</button>
+      </div>
+      <div class="pin-err" id="pin-err">PIN incorrecto. Intentá de nuevo.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PANEL ASESOR
+═══════════════════════════════════════ -->
+<div id="asesor-panel">
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <div class="av-sm" id="ap-av">?</div>
+      <div>
+        <h1 id="ap-nombre">Asesor</h1>
+        <p><span class="live-dot"></span>Planilla de carga</p>
+      </div>
+    </div>
+    <button class="btn-exit" onclick="cerrarSesion()">Salir</button>
+  </div>
+
+  <div class="panel-body">
+    <div class="asesor-tabs">
+      <button class="a-tab active" onclick="switchAsesorTab('cargar')">📋 Cargar registro</button>
+      <button class="a-tab" onclick="switchAsesorTab('mis-registros')">📂 Mis registros</button>
+    </div>
+
+    <!-- TAB: Formulario de carga -->
+    <div class="a-tab-panel active" id="atab-cargar">
+
+      <!-- BBDD -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-badge badge-bbdd">BBDD</span>
+          <h3>Base de Datos del Contacto</h3>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label>Nombre del cliente</label>
+            <input type="text" id="f-nombre" placeholder="Nombre completo"/>
+          </div>
+          <div>
+            <label>Teléfono</label>
+            <input type="text" id="f-telefono" placeholder="+591 7..."/>
+          </div>
+          <div>
+            <label>Procedencia BBDD</label>
+            <select id="f-procedencia">
+              <option value="">Seleccionar...</option>
+              <option>BBDD Proyecto</option>
+              <option>BBDD Otro Proyecto</option>
+              <option>Referidos Vendedor</option>
+              <option>Referido Cliente</option>
+              <option>Referido Empresa</option>
+              <option>Facebook</option>
+              <option>Walk-in</option>
+              <option>Otro</option>
+              <option>---</option>
+            </select>
+          </div>
+          <div>
+            <label>Fecha de llamada</label>
+            <input type="date" id="f-fecha-llamada"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- TLMK -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-badge badge-tlmk">TLMK</span>
+          <h3>Telemarketing</h3>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label>Gestión</label>
+            <select id="f-gestion">
+              <option value="">Seleccionar...</option>
+              <option>Llamada Propia</option>
+              <option>Llamada TLMK</option>
+              <option>Walk-in</option>
+              <option>Referido Cliente</option>
+              <option>Referido Empresa</option>
+              <option>Facebook</option>
+              <option>Otro</option>
+            </select>
+          </div>
+          <div>
+            <label>Mes</label>
+            <select id="f-mes">
+              <option value="">Seleccionar...</option>
+              <option>Enero</option><option>Febrero</option><option>Marzo</option>
+              <option>Abril</option><option>Mayo</option><option>Junio</option>
+              <option>Julio</option><option>Agosto</option><option>Septiembre</option>
+              <option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENDA -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-badge badge-agenda">AGENDA</span>
+          <h3>Agenda</h3>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label>Fecha agendada</label>
+            <input type="date" id="f-fecha-agenda"/>
+          </div>
+          <div>
+            <label>Hora agendada</label>
+            <input type="time" id="f-hora-agenda"/>
+          </div>
+          <div>
+            <label>Número de visita</label>
+            <select id="f-tipo-visita" onchange="verificarVisitaRepetida()">
+              <option value="">Seleccionar...</option>
+              <option>1era Visita</option>
+              <option>2da Visita</option>
+              <option>3era Visita</option>
+              <option>Re-Agenda</option>
+              <option>Reunión Virtual</option>
+            </select>
+            <div id="visita-warning" style="display:none;margin-top:6px;padding:8px 10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;font-size:12px;color:#92400e;">
+              ⚠️ Este cliente ya tiene una 1era Visita. Seleccioná 2da o 3era Visita.
+            </div>
+          </div>
+          <div>
+            <label>¿Visita concretada?</label>
+            <div class="radio-row" style="margin-top:6px;">
+              <label class="radio-pill"><input type="radio" name="visitaConcretada" value="SI">✓ Sí</label>
+              <label class="radio-pill"><input type="radio" name="visitaConcretada" value="NO">✗ No</label>
+              <label class="radio-pill"><input type="radio" name="visitaConcretada" value="Pendiente">⏳ Pend.</label>
+            </div>
+          </div>
+          <div>
+            <label>Fecha visita concretada</label>
+            <input type="date" id="f-fecha-visita"/>
+          </div>
+          <div>
+            <label>Hora visita concretada</label>
+            <input type="time" id="f-hora-visita"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- SHOW DE VENTA -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-badge" style="background:#d1fae5;color:#065f46;">SHOW</span>
+          <h3>Show de Venta</h3>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label>Tipo de Show</label>
+            <select id="f-show">
+              <option value="">Seleccionar...</option>
+              <option>Tour Completo</option>
+              <option>Tour Solo Línea</option>
+              <option>Reunión Virtual</option>
+              <option>No Tour</option>
+            </select>
+          </div>
+          <div>
+            <label>Asesor de Línea</label>
+            <input type="text" id="f-linea" placeholder="Nombre del asesor de línea"/>
+          </div>
+          <div>
+            <label>Asesor de Cierre</label>
+            <input type="text" id="f-cierre" placeholder="Nombre del asesor de cierre"/>
+          </div>
+          <div>
+            <label>¿Hubo cierre?</label>
+            <div class="radio-row" style="margin-top:6px;">
+              <label class="radio-pill"><input type="radio" name="huboCierre" value="SI">✓ Sí</label>
+              <label class="radio-pill"><input type="radio" name="huboCierre" value="NO">✗ No</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VENTA -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-badge badge-venta">VENTA</span>
+          <h3>Datos de Venta</h3>
+        </div>
+        <div class="form-grid col3">
+          <div>
+            <label>Unidad</label>
+            <input type="text" id="f-unidad" placeholder="Ej: M1 203"/>
+          </div>
+          <div>
+            <label>Precio ($)</label>
+            <input type="number" id="f-precio" placeholder="0"/>
+          </div>
+          <div>
+            <label>Forma de pago</label>
+            <select id="f-pago">
+              <option value="">Seleccionar...</option>
+              <option>Contado</option>
+              <option>Contado Diferido</option>
+              <option>Crédito Bancario</option>
+              <option>Crédito Directo</option>
+            </select>
+          </div>
+          <div>
+            <label>Cuota inicial ($)</label>
+            <input type="number" id="f-cuota" placeholder="0"/>
+          </div>
+        </div>
+
+        <!-- Matriz de perfil -->
+        <div style="margin-top:18px;">
+          <label style="margin-bottom:10px;">Perfil del cliente</label>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">¿Le gustó?</div>
+              <div class="radio-row" id="rg-gusto">
+                <label class="radio-pill"><input type="radio" name="gusto" value="SI">SI</label>
+                <label class="radio-pill"><input type="radio" name="gusto" value="NO">NO</label>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">¿Puede pagar?</div>
+              <div class="radio-row" id="rg-pagar">
+                <label class="radio-pill"><input type="radio" name="pagar" value="SI">SI</label>
+                <label class="radio-pill"><input type="radio" name="pagar" value="NO">NO</label>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">¿Puede decidir?</div>
+              <div class="radio-row" id="rg-decidir">
+                <label class="radio-pill"><input type="radio" name="decidir" value="SI">SI</label>
+                <label class="radio-pill"><input type="radio" name="decidir" value="NO">NO</label>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <label>Expectativa</label>
+              <select id="f-expectativa">
+                <option value="">Seleccionar...</option>
+                <option>Alta</option>
+                <option>Media</option>
+                <option>Baja</option>
+              </select>
+            </div>
+            <div>
+              <label>Conclusión</label>
+              <select id="f-conclusion">
+                <option value="">Seleccionar...</option>
+                <option>Seguimiento</option>
+                <option>Descartado</option>
+                <option>Reserva</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ESTADO -->
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-badge badge-estado">ESTADO</span>
+          <h3>Estado Actual y Comentarios</h3>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label>Estado actual</label>
+            <select id="f-estado">
+              <option value="">Seleccionar...</option>
+              <option>Seguimiento</option>
+              <option>Agenda</option>
+              <option>Reserva</option>
+              <option>Contrato</option>
+              <option>En Tramitación Bancaria</option>
+              <option>Coordinación Firma</option>
+              <option>Entrega</option>
+              <option>Desistido</option>
+              <option>Descartado</option>
+            </select>
+          </div>
+          <div>
+            <label>TT (tiempo en proceso)</label>
+            <input type="text" id="f-tt" placeholder="Ej: 1D, 2D, M.Amb."/>
+          </div>
+          <div class="form-col-full">
+            <label>Comentarios</label>
+            <textarea id="f-comentarios" placeholder="Observaciones, situación del cliente, próximos pasos..."></textarea>
+          </div>
+        </div>
+
+        <button class="btn-submit-form" onclick="guardarRegistro()">
+          ✓ Guardar registro
+        </button>
+        <div class="success-banner" id="success-banner">
+          <p>✅ Registro guardado correctamente</p>
+        </div>
+      </div>
+
+    </div><!-- /atab-cargar -->
+
+    <!-- TAB: Mis registros -->
+    <div class="a-tab-panel" id="atab-mis-registros">
+      <div class="mis-registros">
+        <h3>Mis registros</h3>
+        <div id="mis-reg-list">
+          <div class="empty-state">Cargando tus registros...</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /panel-body -->
+</div><!-- /asesor-panel -->
+
+<!-- ═══════════════════════════════════════
+     PANEL ADMIN
+═══════════════════════════════════════ -->
+<div id="admin-panel">
+  <div class="admin-header">
+    <div class="admin-header-left">
+      <div class="av-sm">⚙</div>
+      <div>
+        <h1>Panel de Administración</h1>
+        <p><span class="live-dot"></span>Vista completa — Urubo Village</p>
+      </div>
+    </div>
+    <div class="admin-tabs-wrap">
+      <div class="admin-tabs">
+        <button class="tab-btn active" onclick="switchAdminTab('home')">🏠 Inicio</button>
+        <button class="tab-btn" onclick="switchAdminTab('dashboard')">📊 Ventas</button>
+        <button class="tab-btn" onclick="switchAdminTab('cobranza')">💰 Cobranza<span class="notif-badge" id="badge-mora" style="display:none;">0</span></button>
+        <button class="tab-btn" onclick="switchAdminTab('expensas')">🏘 Expensas</button>
+        <button class="tab-btn" onclick="switchAdminTab('tabla')">📋 Registros</button>
+        <button class="tab-btn" onclick="switchAdminTab('inventario')">🗺 Inventario</button>
+        <button class="tab-btn" onclick="switchAdminTab('asesores')">👥 Asesores</button>
+        <button class="tab-btn" onclick="switchAdminTab('config')">⚙ Config</button>
+      </div>
+      <button class="btn-exit" onclick="cerrarSesion()">Salir</button>
+    </div>
+  </div>
+
+  <div class="admin-body">
+
+    <!-- TAB: HOME — CENTRO DE COMANDO -->
+    <div class="tab-panel active" id="panel-home">
+
+      <!-- Saludo dinámico -->
+      <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h2 style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:#1f2937;" id="home-saludo">Buenos días</h2>
+          <p style="font-size:13px;color:var(--gris);" id="home-fecha">—</p>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="switchAdminTab_btn('cobranza')" style="padding:9px 16px;background:var(--verde);color:#fff;border:none;border-radius:10px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">💰 Ver Cobranza</button>
+          <button onclick="switchAdminTab_btn('inventario')" style="padding:9px 16px;background:#f3f4f6;border:1.5px solid #e5e7eb;border-radius:10px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">🗺 Inventario</button>
+        </div>
+      </div>
+
+      <!-- KPIs top rápidos -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;" id="home-kpis-top">
+        <div class="kpi-card" style="border-left:4px solid #ef4444;">
+          <div class="kpi-label">⚠️ En mora</div>
+          <div class="kpi-num" id="h-mora" style="color:#ef4444;">—</div>
+          <div class="kpi-sub" id="h-mora-monto">cargando...</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid #10b981;">
+          <div class="kpi-label">✅ Al día</div>
+          <div class="kpi-num" id="h-vigente" style="color:#10b981;">—</div>
+          <div class="kpi-sub">clientes vigentes</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid #2563eb;">
+          <div class="kpi-label">📅 Meta cartera</div>
+          <div class="kpi-num" id="h-meta-pct" style="color:#2563eb;">—%</div>
+          <div class="kpi-sub" id="h-meta-sub">este mes</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid #7c3aed;">
+          <div class="kpi-label">🗺 Disponibles</div>
+          <div class="kpi-num" id="h-disponibles" style="color:#7c3aed;">—</div>
+          <div class="kpi-sub">lotes libres</div>
+        </div>
+      </div>
+
+      <div class="home-grid">
+
+        <!-- ALERTAS URGENTES -->
+        <div class="home-section">
+          <h3>🚨 Alertas urgentes</h3>
+          <div id="home-alertas">
+            <div class="empty-state" style="padding:16px;">Cargando alertas...</div>
+          </div>
+        </div>
+
+        <!-- ACCIONES RÁPIDAS -->
+        <div class="home-section">
+          <h3>⚡ Acciones rápidas</h3>
+          <div class="accion-grid">
+            <button class="accion-btn" onclick="switchAdminTab_btn('cobranza')">
+              <div class="accion-icon">💰</div>
+              <div class="accion-label">Gestionar cobranza</div>
+              <div class="accion-sub" id="ac-mora-n">— en mora</div>
+            </button>
+            <button class="accion-btn" onclick="switchAdminTab_btn('expensas')">
+              <div class="accion-icon">🏘</div>
+              <div class="accion-label">Ver expensas</div>
+              <div class="accion-sub">pendientes del mes</div>
+            </button>
+            <button class="accion-btn" onclick="switchAdminTab_btn('dashboard')">
+              <div class="accion-icon">📊</div>
+              <div class="accion-label">Dashboard ventas</div>
+              <div class="accion-sub" id="ac-ventas-n">— registros</div>
+            </button>
+            <button class="accion-btn" onclick="switchAdminTab_btn('inventario')">
+              <div class="accion-icon">🗺</div>
+              <div class="accion-label">Inventario lotes</div>
+              <div class="accion-sub" id="ac-inv-n">— disponibles</div>
+            </button>
+            <button class="accion-btn" onclick="switchAdminTab_btn('tabla')">
+              <div class="accion-icon">📋</div>
+              <div class="accion-label">Registros asesores</div>
+              <div class="accion-sub" id="ac-reg-n">— este mes</div>
+            </button>
+            <button class="accion-btn" onclick="abrirModalMeta('cartera')">
+              <div class="accion-icon">🎯</div>
+              <div class="accion-label">Cargar meta mes</div>
+              <div class="accion-sub">cartera / expensas</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- SEMÁFORO MORA -->
+        <div class="home-section">
+          <h3>🚦 Semáforo de mora</h3>
+          <div class="mora-semaforo">
+            <div class="mora-nivel" style="background:#fef2f2;">
+              <div class="n" style="color:#ef4444;" id="h-mora-alta">—</div>
+              <div class="l" style="color:#ef4444;">+60 días</div>
+            </div>
+            <div class="mora-nivel" style="background:#fffbeb;">
+              <div class="n" style="color:#f59e0b;" id="h-mora-media">—</div>
+              <div class="l" style="color:#f59e0b;">30–60 días</div>
+            </div>
+            <div class="mora-nivel" style="background:#fefce8;">
+              <div class="n" style="color:#ca8a04;" id="h-mora-baja">—</div>
+              <div class="l" style="color:#ca8a04;">1–29 días</div>
+            </div>
+          </div>
+          <div style="margin-top:14px;">
+            <div style="font-size:11px;color:var(--gris);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Top mora — sin gestión reciente</div>
+            <div id="home-top-mora" style="max-height:180px;overflow-y:auto;">
+              <div class="empty-state" style="padding:10px;">Cargando...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- METAS DEL MES -->
+        <div class="home-section">
+          <h3>🎯 Metas del mes</h3>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">Cartera</div>
+            <div class="meta-mini-wrap">
+              <div class="meta-mini-row">
+                <span id="h-cob-cobrado">— Bs.</span>
+                <span id="h-cob-meta">meta: —</span>
+              </div>
+              <div class="meta-mini-track">
+                <div class="meta-mini-fill" id="h-cob-bar" style="width:0%;background:linear-gradient(90deg,#2d5a27,#4a8c3f);"></div>
+              </div>
+              <div style="font-size:11px;color:var(--gris);margin-top:3px;" id="h-cob-pct-txt">—%</div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;">Expensas</div>
+            <div class="meta-mini-wrap">
+              <div class="meta-mini-row">
+                <span id="h-exp-cobrado">— Bs.</span>
+                <span id="h-exp-meta">meta: —</span>
+              </div>
+              <div class="meta-mini-track">
+                <div class="meta-mini-fill" id="h-exp-bar" style="width:0%;background:linear-gradient(90deg,#1d4ed8,#3b82f6);"></div>
+              </div>
+              <div style="font-size:11px;color:var(--gris);margin-top:3px;" id="h-exp-pct-txt">—%</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f3f4f6;">
+            <div style="font-size:11px;color:var(--gris);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Ventas este mes</div>
+            <div id="h-ventas-resumen">
+              <div class="empty-state" style="padding:8px;">Cargando...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLIENTES SIN GESTIÓN -->
+        <div class="home-section home-grid-full">
+          <h3>📋 Clientes en mora sin gestión asignada</h3>
+          <div id="home-sin-gestion">
+            <div class="empty-state" style="padding:16px;">Cargando...</div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /panel-home -->
+
+    <!-- TAB: Dashboard Ventas -->
+    <div class="tab-panel" id="panel-dashboard">
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label"><span class="kpi-icon">👥</span>Total registros</div>
+          <div class="kpi-num" id="kpi-total">—</div>
+          <div class="kpi-sub" id="kpi-total-sub">todos los asesores</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label"><span class="kpi-icon">📅</span>Este mes</div>
+          <div class="kpi-num" id="kpi-mes">—</div>
+          <div class="kpi-sub" id="kpi-mes-sub">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label"><span class="kpi-icon">🏆</span>Contratos / Reservas</div>
+          <div class="kpi-num" id="kpi-contratos">—</div>
+          <div class="kpi-sub" id="kpi-contratos-sub">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label"><span class="kpi-icon">💰</span>Precio total ($)</div>
+          <div class="kpi-num" id="kpi-precio" style="font-size:22px;">—</div>
+          <div class="kpi-sub" id="kpi-precio-sub">registros con precio</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h4>🔽 Embudo de conversión (mes)</h4>
+          <div id="chart-funnel"></div>
+        </div>
+        <div class="chart-card">
+          <h4>📅 Visitas por tipo (mes)</h4>
+          <div id="chart-visitas"></div>
+        </div>
+        <div class="chart-card">
+          <h4>👤 Registros por asesor (mes)</h4>
+          <div id="chart-asesores"></div>
+        </div>
+        <div class="chart-card">
+          <h4>📊 Estados actuales</h4>
+          <div id="chart-estados"></div>
+        </div>
+        <div class="chart-card">
+          <h4>🎯 Perfil de cierre (mes)</h4>
+          <div id="chart-perfil" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;"></div>
+        </div>
+        <div class="chart-card">
+          <h4>💳 Forma de pago</h4>
+          <div id="chart-pago"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB: Registros -->
+    <div class="tab-panel" id="panel-tabla">
+      <div class="admin-section">
+        <h3>Todos los registros</h3>
+        <div class="filters-bar">
+          <div>
+            <label>Asesor</label>
+            <select id="fil-asesor" onchange="renderTablaAdmin()">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div>
+            <label>Estado</label>
+            <select id="fil-estado" onchange="renderTablaAdmin()">
+              <option value="">Todos</option>
+              <option>Seguimiento</option><option>Agenda</option><option>Reserva</option>
+              <option>Contrato</option><option>En Tramitación Bancaria</option>
+              <option>Coordinación Firma</option><option>Entrega</option>
+              <option>Desistido</option><option>Descartado</option>
+            </select>
+          </div>
+          <div>
+            <label>Mes</label>
+            <select id="fil-mes" onchange="renderTablaAdmin()">
+              <option value="">Todos</option>
+              <option>Enero</option><option>Febrero</option><option>Marzo</option>
+              <option>Abril</option><option>Mayo</option><option>Junio</option>
+              <option>Julio</option><option>Agosto</option><option>Septiembre</option>
+              <option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+            </select>
+          </div>
+          <div>
+            <label>Conclusión</label>
+            <select id="fil-conclusion" onchange="renderTablaAdmin()">
+              <option value="">Todas</option>
+              <option>Seguimiento</option><option>Descartado</option><option>Reserva</option>
+            </select>
+          </div>
+          <button class="btn-clear" onclick="limpiarFiltros()">✕ Limpiar</button>
+          <button class="btn-export" onclick="exportarExcel()">⬇ Excel</button>
+        </div>
+
+        <div class="tabla-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha carga</th>
+                <th>Asesor</th>
+                <th>Cliente</th>
+                <th>Teléfono</th>
+                <th>Procedencia</th>
+                <th>Gestión</th>
+                <th>Mes</th>
+                <th>Nº Visita</th>
+                <th>F. Agendada</th>
+                <th>H. Agendada</th>
+                <th>Visita Concretada</th>
+                <th>F. Concretada</th>
+                <th>Show</th>
+                <th>Línea</th>
+                <th>Cierre</th>
+                <th>¿Hubo cierre?</th>
+                <th>Unidad</th>
+                <th>Precio</th>
+                <th>Forma pago</th>
+                <th>Le gustó</th>
+                <th>Puede pagar</th>
+                <th>Puede decidir</th>
+                <th>Expectativa</th>
+                <th>Conclusión</th>
+                <th>Estado</th>
+                <th>Comentarios</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-admin-body">
+              <tr><td colspan="20" class="empty-state">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Asesores -->
+    <div class="tab-panel" id="panel-asesores">
+      <div class="admin-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h3 style="margin:0;">Asesores registrados</h3>
+          <span style="font-size:13px;color:var(--gris);" id="asesores-count">0 asesores</span>
+        </div>
+        <div id="asesores-list">
+          <div class="empty-state">Cargando...</div>
+        </div>
+        <div class="add-vendor-row" style="margin-top:16px;">
+          <input type="text" id="new-asesor-name" placeholder="Nombre del asesor..."/>
+          <input type="text" class="pin-inp" id="new-asesor-pin" placeholder="PIN (4 díg.)" maxlength="4" pattern="[0-9]{4}"/>
+          <button class="btn-add-vendor" onclick="agregarAsesor()">+ Agregar</button>
+        </div>
+        <p style="font-size:12px;color:var(--gris);margin-top:8px;">El PIN es privado por asesor. Cada asesor solo ve sus propios registros.</p>
+      </div>
+    </div>
+
+    <!-- TAB: Config -->
+    <div class="tab-panel" id="panel-config">
+      <div class="admin-section">
+        <h3>PIN de administrador</h3>
+        <p style="font-size:13px;color:var(--gris);margin-bottom:12px;">
+          PIN actual guardado en este navegador. Compartilo solo con el Controller y el Gerente Comercial.
+        </p>
+        <div class="pin-change-row">
+          <input type="password" id="new-admin-pin" placeholder="Nuevo PIN (4 dígitos)" maxlength="4" pattern="[0-9]{4}"/>
+          <button class="btn-save-pin" onclick="cambiarPinAdmin()">Guardar PIN</button>
+        </div>
+        <div id="pin-change-msg" style="margin-top:10px;font-size:13px;display:none;"></div>
+      </div>
+
+      <!-- Estados de gestión dinámicos -->
+      <div class="admin-section">
+        <h3>Estados de gestión de cobranza</h3>
+        <p style="font-size:13px;color:var(--gris);margin-bottom:16px;">
+          Definí los estados que usás en el flujo de cobranza. Podés agregar, editar o eliminar en cualquier momento.
+        </p>
+        <div id="estados-config-list">
+          <div class="empty-state">Cargando estados...</div>
+        </div>
+        <div class="add-estado-row">
+          <div>
+            <label>Nombre del estado</label>
+            <input type="text" id="new-estado-nombre" placeholder="Ej: Acuerdo de pago..."/>
+          </div>
+          <div>
+            <label>Ícono</label>
+            <input type="text" id="new-estado-icono" placeholder="🤝" maxlength="4" style="width:70px; text-align:center; font-size:18px;"/>
+          </div>
+          <div>
+            <label>Color</label>
+            <input type="color" id="new-estado-color" value="#3b82f6" style="width:50px; height:42px; padding:2px; border:1.5px solid #e5e7eb; border-radius:8px; cursor:pointer;"/>
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button class="btn-add-estado" onclick="agregarEstado()">+ Agregar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3>Información del sistema</h3>
+        <p style="font-size:13px;color:var(--gris);line-height:1.7;">
+          <strong>Base de datos:</strong> Firebase Realtime DB — urubo-village-2<br>
+          <strong>API Orange:</strong> GetCartera + GetExpensas (tiempo real)<br>
+          <strong>Nodos Firebase:</strong> <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">planilla / estados_cobranza / gestiones_cobranza / estado_cliente / metas / inventario_lotes</code><br>
+          <strong>Hosting sugerido:</strong> GitHub Pages (gratis, sin límite de deploys)
+        </p>
+      </div>
+    </div>
+
+    <!-- TAB: Inventario -->
+    <div class="tab-panel" id="panel-inventario">
+
+      <!-- Tipos de cambio -->
+      <div class="admin-section" style="margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:13px;font-weight:600;color:#374151;">Tipo de cambio oficial:</span>
+            <span style="font-size:12px;color:#6b7280;">$1 =</span>
+            <input type="number" id="tc-oficial" value="6.96" step="0.01" style="width:80px;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;" oninput="recalcularPrecios()"/>
+            <span style="font-size:12px;color:#6b7280;">Bs.</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:13px;font-weight:600;color:#374151;">Tipo de cambio referencial:</span>
+            <span style="font-size:12px;color:#6b7280;">$1 =</span>
+            <input type="number" id="tc-referencial" value="9.50" step="0.01" style="width:80px;padding:6px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;" oninput="recalcularPrecios()"/>
+            <span style="font-size:12px;color:#6b7280;">Bs.</span>
+          </div>
+          <span style="font-size:12px;color:#9ca3af;font-style:italic;">Los precios en $ se calculan automáticamente</span>
+        </div>
+      </div>
+
+      <!-- Stats inventario -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;" id="inv-stats">
+        <div class="kpi-card"><div class="kpi-label">Total lotes</div><div class="kpi-num" id="inv-total">—</div></div>
+        <div class="kpi-card"><div class="kpi-label" style="color:#16a34a;">Disponibles</div><div class="kpi-num" style="color:#16a34a;" id="inv-disponibles">—</div></div>
+        <div class="kpi-card"><div class="kpi-label" style="color:#d97706;">Reservados</div><div class="kpi-num" style="color:#d97706;" id="inv-reservados">—</div></div>
+        <div class="kpi-card"><div class="kpi-label" style="color:#dc2626;">Vendidos</div><div class="kpi-num" style="color:#dc2626;" id="inv-vendidos">—</div></div>
+      </div>
+
+      <div class="admin-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
+          <h3 style="margin:0;">Inventario de Lotes</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="fil-inv-estado" onchange="renderInventario()" style="padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;">
+              <option value="">Todos los estados</option>
+              <option>Disponible</option>
+              <option>Reservado</option>
+              <option>Vendido</option>
+              <option>No disponible</option>
+            </select>
+            <button class="btn-export" onclick="exportarInventario()">⬇ Excel</button>
+            <button class="btn-add-vendor" onclick="mostrarFormLote()">+ Agregar lote</button>
+          </div>
+        </div>
+
+        <!-- Formulario agregar/editar lote -->
+        <div id="form-lote" style="display:none;background:#f8f9fa;border-radius:12px;padding:20px;margin-bottom:20px;border:1.5px solid #e5e7eb;">
+          <h4 style="font-family:'Cormorant Garamond',serif;font-size:18px;margin-bottom:16px;" id="form-lote-title">Agregar lote</h4>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px;">
+            <div>
+              <label>UV (Nº Urbanización)</label>
+              <input type="number" id="l-uv" placeholder="Ej: 1" min="1"/>
+            </div>
+            <div>
+              <label>Manzano</label>
+              <input type="number" id="l-manzano" placeholder="Ej: 4" min="1"/>
+            </div>
+            <div>
+              <label>Lote</label>
+              <input type="number" id="l-lote" placeholder="Ej: 31" min="1"/>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+              <label>Metraje (m²)</label>
+              <input type="number" id="l-metraje" placeholder="Ej: 250.5" step="0.01"/>
+            </div>
+            <div>
+              <label>Precio de venta ($)</label>
+              <input type="number" id="l-precio" placeholder="Ej: 45000" oninput="previsualizarCambio()"/>
+            </div>
+            <div>
+              <label>Precio en Bs. (oficial) <span style="color:#9ca3af;font-weight:400;">auto</span></label>
+              <input type="number" id="l-precio-oficial" placeholder="—" readonly style="background:#f3f4f6;color:#6b7280;"/>
+            </div>
+            <div>
+              <label>Precio real en $ (ref.) <span style="color:#9ca3af;font-weight:400;">auto</span></label>
+              <input type="number" id="l-precio-ref" placeholder="—" readonly style="background:#f3f4f6;color:#6b7280;"/>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+            <div>
+              <label>Estado</label>
+              <select id="l-estado">
+                <option value="">Seleccionar...</option>
+                <option>Disponible</option>
+                <option>Reservado</option>
+                <option>Vendido</option>
+                <option>No disponible</option>
+              </select>
+            </div>
+            <div>
+              <label>Observaciones</label>
+              <input type="text" id="l-obs" placeholder="Observaciones opcionales..."/>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn-add-vendor" onclick="guardarLote()" id="btn-guardar-lote">Guardar lote</button>
+            <button class="btn-clear" onclick="cancelarFormLote()">Cancelar</button>
+          </div>
+        </div>
+
+        <!-- Tabla inventario -->
+        <div class="tabla-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>UV</th>
+                <th>Manzano</th>
+                <th>Lote</th>
+                <th>Metraje (m²)</th>
+                <th>Precio ($)</th>
+                <th>Precio en Bs. (oficial)</th>
+                <th>Precio real en $ (ref.)</th>
+                <th>Estado</th>
+                <th>Observaciones</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="inv-tabla-body">
+              <tr><td colspan="11" class="empty-state">Cargando inventario...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /panel-inventario -->
+
+    <!-- ═══════════════════════════════════
+         TAB: COBRANZA CARTERA
+    ════════════════════════════════════ -->
+    <div class="tab-panel" id="panel-cobranza">
+
+      <!-- KPIs cobranza -->
+      <div class="cob-kpi-grid" id="cob-kpis">
+        <div class="cob-kpi" style="border-left-color:#2d5a27;">
+          <div class="cob-kpi-label">Total cartera</div>
+          <div class="cob-kpi-val" id="ck-total">—</div>
+          <div class="cob-kpi-sub" id="ck-total-sub">cargando...</div>
+        </div>
+        <div class="cob-kpi" style="border-left-color:#ef4444;">
+          <div class="cob-kpi-label">En mora</div>
+          <div class="cob-kpi-val" id="ck-mora" style="color:#ef4444;">—</div>
+          <div class="cob-kpi-sub" id="ck-mora-sub">clientes</div>
+        </div>
+        <div class="cob-kpi" style="border-left-color:#10b981;">
+          <div class="cob-kpi-label">Al día / Vigente</div>
+          <div class="cob-kpi-val" id="ck-vigente" style="color:#10b981;">—</div>
+          <div class="cob-kpi-sub" id="ck-vigente-sub">clientes</div>
+        </div>
+        <div class="cob-kpi" style="border-left-color:#3b82f6;">
+          <div class="cob-kpi-label">Pago adelantado</div>
+          <div class="cob-kpi-val" id="ck-adelantado" style="color:#3b82f6;">—</div>
+          <div class="cob-kpi-sub">clientes</div>
+        </div>
+      </div>
+
+      <!-- Meta mensual cartera -->
+      <div class="meta-bar-wrap">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div>
+            <div style="font-size:16px; font-weight:600; font-family:'Cormorant Garamond',serif; color:#1f2937;">Meta mensual — Cartera</div>
+            <div style="font-size:12px; color:var(--gris);" id="meta-cob-periodo">Mayo 2026</div>
+          </div>
+          <button onclick="abrirModalMeta('cartera')" style="padding:8px 16px; background:var(--verde); color:#fff; border:none; border-radius:10px; font-size:13px; cursor:pointer; font-family:'DM Sans',sans-serif;">✎ Editar meta</button>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:14px;" id="meta-cob-nums">
+          <div><div style="font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:4px;">Meta</div>
+            <div style="font-size:22px;font-weight:700;font-family:'Cormorant Garamond',serif;" id="meta-cob-val">— Bs.</div></div>
+          <div><div style="font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:4px;">Cobrado (API)</div>
+            <div style="font-size:22px;font-weight:700;font-family:'Cormorant Garamond',serif;color:#2d5a27;" id="meta-cob-cobrado">— Bs.</div></div>
+          <div><div style="font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:4px;">% Alcanzado</div>
+            <div class="meta-bar-pct" id="meta-cob-pct" style="color:#2d5a27;">—%</div></div>
+        </div>
+        <div class="meta-bar-track">
+          <div class="meta-bar-fill" id="meta-cob-bar" style="width:0%; background:linear-gradient(90deg,#2d5a27,#4a8c3f);"></div>
+        </div>
+      </div>
+
+      <!-- Filtros y búsqueda -->
+      <div class="admin-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+          <h3 style="margin:0;">Clientes — Cartera activa</h3>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span id="cob-live-ind" style="font-size:12px; color:#10b981;"><span class="live-dot"></span>Datos en vivo</span>
+            <button onclick="cargarCartera()" style="padding:8px 14px; background:#f3f4f6; border:1.5px solid #e5e7eb; border-radius:8px; font-size:12px; cursor:pointer; font-family:'DM Sans',sans-serif;">↻ Actualizar</button>
+          </div>
+        </div>
+
+        <div class="cob-search-bar">
+          <input type="text" id="cob-buscar" placeholder="🔍 Buscar cliente o terreno..." oninput="renderCartera()"/>
+          <select id="cob-fil-asesor" onchange="renderCartera()">
+            <option value="">Todos los asesores</option>
+          </select>
+          <select id="cob-fil-estado-pago" onchange="renderCartera()">
+            <option value="">Todos los estados Orange</option>
+            <option>Mora</option>
+            <option>Vigente</option>
+            <option>Pago Adelantado</option>
+          </select>
+          <select id="cob-fil-estado-gestion" onchange="renderCartera()">
+            <option value="">Todos los estados gestión</option>
+          </select>
+          <select id="cob-fil-mes" onchange="renderCartera()">
+            <option value="">Todos los meses</option>
+            <option>Enero</option><option>Febrero</option><option>Marzo</option>
+            <option>Abril</option><option>Mayo</option><option>Junio</option>
+            <option>Julio</option><option>Agosto</option><option>Septiembre</option>
+            <option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+          </select>
+        </div>
+
+        <div id="cob-lista">
+          <div class="loading-spin"><div class="spinner"></div><br>Cargando datos de Orange...</div>
+        </div>
+      </div>
+    </div><!-- /panel-cobranza -->
+
+    <!-- ═══════════════════════════════════
+         TAB: EXPENSAS
+    ════════════════════════════════════ -->
+    <div class="tab-panel" id="panel-expensas">
+
+      <!-- Meta expensas -->
+      <div class="meta-bar-wrap">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <div>
+            <div style="font-size:16px; font-weight:600; font-family:'Cormorant Garamond',serif; color:#1f2937;">Meta mensual — Expensas</div>
+            <div style="font-size:12px; color:var(--gris);" id="meta-exp-periodo">Mayo 2026</div>
+          </div>
+          <button onclick="abrirModalMeta('expensas')" style="padding:8px 16px; background:var(--azul); color:#fff; border:none; border-radius:10px; font-size:13px; cursor:pointer; font-family:'DM Sans',sans-serif;">✎ Editar meta</button>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:14px;">
+          <div><div style="font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:4px;">Meta (Bs.)</div>
+            <div style="font-size:20px;font-weight:700;font-family:'Cormorant Garamond',serif;" id="meta-exp-val">—</div></div>
+          <div><div style="font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:4px;">Cobrado (API)</div>
+            <div style="font-size:20px;font-weight:700;font-family:'Cormorant Garamond',serif;color:#2563eb;" id="meta-exp-cobrado">—</div></div>
+          <div><div style="font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:4px;">% Alcanzado</div>
+            <div class="meta-bar-pct" id="meta-exp-pct" style="color:#2563eb;">—%</div></div>
+          <div><div style="font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:4px;">Propiedades</div>
+            <div style="font-size:20px;font-weight:700;font-family:'Cormorant Garamond',serif;" id="meta-exp-props">—</div></div>
+        </div>
+        <div class="meta-bar-track">
+          <div class="meta-bar-fill" id="meta-exp-bar" style="width:0%; background:linear-gradient(90deg,#1d4ed8,#3b82f6);"></div>
+        </div>
+      </div>
+
+      <!-- Lista de expensas -->
+      <div class="admin-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+          <h3 style="margin:0;">Detalle de expensas</h3>
+          <div style="display:flex; gap:8px;">
+            <button onclick="cargarExpensas()" style="padding:8px 14px; background:#f3f4f6; border:1.5px solid #e5e7eb; border-radius:8px; font-size:12px; cursor:pointer; font-family:'DM Sans',sans-serif;">↻ Actualizar</button>
+          </div>
+        </div>
+        <div class="cob-search-bar" style="margin-bottom:16px;">
+          <input type="text" id="exp-buscar" placeholder="🔍 Buscar inmueble o propietario..." oninput="renderExpensas()"/>
+          <select id="exp-fil-estado" onchange="renderExpensas()">
+            <option value="">Todos los estados</option>
+            <option>Mora</option>
+            <option>Vigente</option>
+            <option>Pago Adelantado</option>
+          </select>
+        </div>
+        <div id="exp-lista">
+          <div class="loading-spin"><div class="spinner"></div><br>Cargando datos de expensas...</div>
+        </div>
+      </div>
+    </div><!-- /panel-expensas -->
+
+  </div><!-- /admin-body -->
+</div><!-- /admin-panel -->
+
+<!-- ═══════════════════════════════════
+     PANEL LATERAL — DETALLE CLIENTE
+════════════════════════════════════ -->
+<div class="slide-overlay" id="slide-overlay" onclick="cerrarSlide()"></div>
+<div class="slide-panel" id="slide-panel">
+  <div class="slide-header">
+    <div>
+      <h3 id="sp-nombre">Cliente</h3>
+      <p id="sp-sub">Terreno — Asesor</p>
+    </div>
+    <button class="slide-close" onclick="cerrarSlide()">×</button>
+  </div>
+  <div class="slide-body">
+
+    <!-- Resumen financiero -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
+      <div style="background:#f8f9fa; border-radius:10px; padding:12px; text-align:center;">
+        <div style="font-size:11px; color:var(--gris); margin-bottom:4px;">Deuda total</div>
+        <div style="font-size:18px; font-weight:700; font-family:'Cormorant Garamond',serif; color:#ef4444;" id="sp-deuda">—</div>
+      </div>
+      <div style="background:#f8f9fa; border-radius:10px; padding:12px; text-align:center;">
+        <div style="font-size:11px; color:var(--gris); margin-bottom:4px;">Días mora</div>
+        <div style="font-size:18px; font-weight:700; font-family:'Cormorant Garamond',serif; color:#f59e0b;" id="sp-dias">—</div>
+      </div>
+      <div style="background:#f8f9fa; border-radius:10px; padding:12px; text-align:center;">
+        <div style="font-size:11px; color:var(--gris); margin-bottom:4px;">Cuotas</div>
+        <div style="font-size:18px; font-weight:700; font-family:'Cormorant Garamond',serif;" id="sp-cuotas">—</div>
+      </div>
+    </div>
+
+    <!-- Asignar estado de gestión -->
+    <div class="estado-form">
+      <h4>Asignar estado de gestión</h4>
+      <div class="estado-btns-grid" id="sp-estados-btns"></div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px; font-weight:600; color:#374151; text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:5px;">Nota de gestión</label>
+        <textarea id="sp-nota" style="width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:13px; font-family:'DM Sans',sans-serif; resize:vertical; min-height:60px;" placeholder="Comentario, acuerdo, observación..."></textarea>
+      </div>
+      <button class="btn-guardar-estado" onclick="guardarEstadoCliente()">✓ Guardar gestión</button>
+    </div>
+
+    <!-- Cuotas del cliente -->
+    <div style="margin-top:20px;">
+      <h4 style="font-family:'Cormorant Garamond',serif; font-size:16px; margin-bottom:10px;">Cuotas pendientes</h4>
+      <div id="sp-cuotas-list"></div>
+    </div>
+
+    <!-- Historial de gestiones -->
+    <div style="margin-top:20px;">
+      <h4 style="font-family:'Cormorant Garamond',serif; font-size:16px; margin-bottom:10px;">Historial de gestiones</h4>
+      <div id="sp-historial">
+        <div class="empty-state" style="padding:20px;">Sin gestiones registradas aún.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     MODAL METAS
+════════════════════════════════════ -->
+<div class="meta-modal-backdrop" id="meta-modal-backdrop">
+  <div class="meta-modal">
+    <h3 id="meta-modal-title">Cargar meta mensual</h3>
+    <div class="meta-input-row">
+      <label id="meta-modal-periodo-label">Mes</label>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+        <div>
+          <label>Mes</label>
+          <select id="meta-mes-sel" style="width:100%; padding:10px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:14px; font-family:'DM Sans',sans-serif;">
+            <option>Enero</option><option>Febrero</option><option>Marzo</option>
+            <option>Abril</option><option selected>Mayo</option><option>Junio</option>
+            <option>Julio</option><option>Agosto</option><option>Septiembre</option>
+            <option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+          </select>
+        </div>
+        <div>
+          <label>Año</label>
+          <input type="number" id="meta-anio-inp" value="2026" min="2024" max="2030" style="width:100%; padding:10px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:14px; font-family:'DM Sans',sans-serif;"/>
+        </div>
+      </div>
+    </div>
+    <div class="meta-input-row">
+      <label id="meta-tipo-label">Meta (Bs.)</label>
+      <input type="number" id="meta-monto-inp" placeholder="Ej: 380000" style="font-size:20px;"/>
+    </div>
+    <div class="meta-modal-footer">
+      <button class="btn-meta-cancel" onclick="cerrarModalMeta()">Cancelar</button>
+      <button class="btn-meta-save" onclick="guardarMeta()">✓ Guardar meta</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   ESTADO GLOBAL
+═══════════════════════════════════════════ */
+let asesores    = [];        /* [{nombre, pin, _key}] */
+let todosRegs   = [];        /* admin: todos los registros */
+let misRegs     = [];        /* asesor: solo los suyos */
+let asesorActual = null;     /* {nombre, pin, _key} */
+let modoAdmin   = false;
+
+let pinAdminLocal = localStorage.getItem('uv_planilla_pin') || '0000';
+let pinBuf = '';
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+document.addEventListener('fb-ready', () => {
+  window._fbListenAsesores(arr => {
+    asesores = arr;
+    renderAsesorGrid();
+    if (modoAdmin) renderAsesoresAdmin();
+    if (asesorActual) renderMisRegistros();
+  });
+});
+
+/* Fallback si FB tarda */
+setTimeout(() => {
+  if (!window._fbReady) {
+    document.getElementById('asesor-grid').innerHTML =
+      '<div style="text-align:center;padding:20px;color:var(--rojo);font-size:13px;">Error conectando con Firebase. Revisá tu conexión.</div>';
+  }
+}, 6000);
+
+/* ═══════════════════════════════════════════
+   LOGIN — PASO 1: GRILLA ASESORES
+═══════════════════════════════════════════ */
+function renderAsesorGrid() {
+  const grid = document.getElementById('asesor-grid');
+  if (!asesores.length) {
+    grid.innerHTML = '<div class="empty-state">No hay asesores configurados.<br>El administrador debe agregar asesores.</div>';
+    return;
+  }
+  grid.innerHTML = asesores.map(a => `
+    <button class="asesor-btn" onclick="seleccionarAsesor('${a._key}')">
+      <div class="av">${iniciales(a.nombre)}</div>
+      <div class="info">
+        <div class="name">${a.nombre}</div>
+        <div class="role">Asesor comercial</div>
+      </div>
+    </button>`).join('');
+}
+
+function iniciales(nombre) {
+  return nombre.split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2);
+}
+
+/* ═══════════════════════════════════════════
+   LOGIN — PASO 2: PIN
+═══════════════════════════════════════════ */
+function seleccionarAsesor(key) {
+  const a = asesores.find(x => x._key === key);
+  if (!a) return;
+  asesorActual = a;
+  modoAdmin = false;
+  mostrarPinStep(a.nombre, false);
+}
+
+function seleccionarAdmin() {
+  asesorActual = null;
+  modoAdmin = true;
+  mostrarPinStep('Administrador', true);
+}
+
+function mostrarPinStep(nombre, esAdmin) {
+  document.getElementById('step-usuario').style.display = 'none';
+  document.getElementById('pin-step').style.display    = 'block';
+
+  const av = document.getElementById('sel-av');
+  av.textContent  = esAdmin ? '⚙' : iniciales(nombre);
+  av.className    = 'av' + (esAdmin ? ' av-admin' : '');
+  document.getElementById('sel-name').textContent = nombre;
+  document.getElementById('pin-err').style.display = 'none';
+  pinBuf = '';
+  actualizarDots();
+}
+
+function volverPaso1() {
+  document.getElementById('step-usuario').style.display = 'block';
+  document.getElementById('pin-step').style.display    = 'none';
+  pinBuf = '';
+}
+
+function pinPress(v) {
+  if (v==='del') pinBuf = pinBuf.slice(0,-1);
+  else if (v==='clr') pinBuf = '';
+  else if (pinBuf.length < 4) pinBuf += v;
+  document.getElementById('pin-err').style.display = 'none';
+  actualizarDots();
+  if (pinBuf.length === 4) setTimeout(verificarPin, 120);
+}
+
+function actualizarDots() {
+  for (let i=0;i<4;i++)
+    document.getElementById('pd'+i).classList.toggle('filled', i < pinBuf.length);
+}
+
+function verificarPin() {
+  if (modoAdmin) {
+    if (pinBuf === pinAdminLocal) { entrarAdmin(); return; }
+  } else {
+    if (asesorActual && pinBuf === asesorActual.pin) { entrarAsesor(); return; }
+  }
+  document.getElementById('pin-err').style.display = 'block';
+  pinBuf = ''; actualizarDots();
+}
+
+/* ═══════════════════════════════════════════
+   ENTRAR
+═══════════════════════════════════════════ */
+function entrarAsesor() {
+  document.getElementById('login-screen').style.display  = 'none';
+  document.getElementById('asesor-panel').style.display  = 'block';
+  document.getElementById('ap-av').textContent    = iniciales(asesorActual.nombre);
+  document.getElementById('ap-nombre').textContent = asesorActual.nombre;
+  /* Escuchar solo sus registros */
+  window._fbListenRegistros(asesorActual._key, arr => {
+    misRegs = arr;
+    renderMisRegistros();
+  });
+  /* Poner mes actual en el select */
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('f-mes').value = meses[new Date().getMonth()];
+  /* Fecha de hoy */
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('f-fecha-llamada').value = hoy;
+}
+
+function entrarAdmin() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-panel').style.display  = 'block';
+  /* Escuchar todos los registros */
+  window._fbListenTodos(arr => {
+    todosRegs = arr;
+    poblarFiltroAsesor();
+    renderDashboard();
+    renderTablaAdmin();
+  });
+  renderAsesoresAdmin();
+  iniciarInventario();
+}
+
+function cerrarSesion() {
+  location.reload();
+}
+
+/* ═══════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════ */
+function switchAsesorTab(id) {
+  document.querySelectorAll('.a-tab').forEach((b,i) => {
+    const ids = ['cargar','mis-registros'];
+    b.classList.toggle('active', ids[i]===id);
+  });
+  document.querySelectorAll('.a-tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('atab-' + (id==='mis-registros'?'mis-registros':'cargar')).classList.add('active');
+}
+
+function switchAdminTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('panel-' + id);
+  if (panel) panel.classList.add('active');
+  // Refresh home si se vuelve a él
+  if (id === 'home') renderHome();
+}
+
+/* ═══════════════════════════════════════════
+   RADIO PILLS — interactividad
+═══════════════════════════════════════════ */
+document.addEventListener('change', e => {
+  if (e.target.type !== 'radio') return;
+  const row = e.target.closest('.radio-row');
+  if (!row) return;
+  row.querySelectorAll('.radio-pill').forEach(p => {
+    p.classList.remove('sel-si','sel-no','sel-gen');
+    const inp = p.querySelector('input');
+    if (inp && inp.checked) {
+      p.classList.add(inp.value==='SI' ? 'sel-si' : 'sel-no');
+    }
+  });
+});
+
+/* ═══════════════════════════════════════════
+   GUARDAR REGISTRO
+═══════════════════════════════════════════ */
+async function guardarRegistro() {
+  const nombre = document.getElementById('f-nombre').value.trim();
+  if (!nombre) { alert('El nombre del cliente es obligatorio.'); return; }
+
+  const data = {
+    ts:                Date.now(),
+    fechaCarga:        new Date().toLocaleString('es-BO'),
+    asesorNombre:      asesorActual.nombre,
+    /* BBDD */
+    nombre,
+    telefono:          document.getElementById('f-telefono').value.trim(),
+    procedencia:       document.getElementById('f-procedencia').value,
+    fechaLlamada:      document.getElementById('f-fecha-llamada').value,
+    /* TLMK */
+    gestion:           document.getElementById('f-gestion').value,
+    mes:               document.getElementById('f-mes').value,
+    /* AGENDA */
+    fechaAgenda:       document.getElementById('f-fecha-agenda').value,
+    horaAgenda:        document.getElementById('f-hora-agenda').value,
+    tipoVisita:        document.getElementById('f-tipo-visita').value,
+    visitaConcretada:  (document.querySelector('input[name=visitaConcretada]:checked')||{}).value || '',
+    fechaVisita:       document.getElementById('f-fecha-visita').value,
+    horaVisita:        document.getElementById('f-hora-visita').value,
+    /* SHOW */
+    show:              document.getElementById('f-show').value,
+    linea:             document.getElementById('f-linea').value.trim(),
+    cierre:            document.getElementById('f-cierre').value.trim(),
+    huboCierre:        (document.querySelector('input[name=huboCierre]:checked')||{}).value || '',
+    /* VENTA */
+    unidad:            document.getElementById('f-unidad').value.trim(),
+    precio:            parseFloat(document.getElementById('f-precio').value) || 0,
+    formaPago:         document.getElementById('f-pago').value,
+    cuotaInicial:      parseFloat(document.getElementById('f-cuota').value) || 0,
+    /* PERFIL */
+    leGusto:           (document.querySelector('input[name=gusto]:checked')||{}).value || '',
+    puedePagar:        (document.querySelector('input[name=pagar]:checked')||{}).value || '',
+    puedeDecidir:      (document.querySelector('input[name=decidir]:checked')||{}).value || '',
+    expectativa:       document.getElementById('f-expectativa').value,
+    conclusion:        document.getElementById('f-conclusion').value,
+    /* ESTADO */
+    estado:            document.getElementById('f-estado').value,
+    tt:                document.getElementById('f-tt').value.trim(),
+    comentarios:       document.getElementById('f-comentarios').value.trim(),
+  };
+
+
+  try {
+    await window._fbPushRegistro(asesorActual._key, data);
+    /* Limpiar form */
+    limpiarForm();
+    const sb = document.getElementById('success-banner');
+    sb.style.display = 'block';
+    setTimeout(() => sb.style.display='none', 3000);
+  } catch(e) {
+    alert('Error al guardar: ' + e.message);
+  }
+}
+
+function limpiarForm() {
+  ['f-nombre','f-telefono','f-fecha-llamada','f-linea','f-unidad',
+   'f-precio','f-cuota','f-cierre','f-tt','f-comentarios',
+   'f-fecha-agenda','f-hora-agenda','f-fecha-visita','f-hora-visita'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['f-procedencia','f-gestion','f-tipo-visita','f-show','f-pago',
+   'f-expectativa','f-conclusion','f-estado'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const vw = document.getElementById('visita-warning');
+  if (vw) vw.style.display = 'none';
+  document.querySelectorAll('input[type=radio]').forEach(r => {
+    r.checked = false;
+    r.closest('.radio-pill')?.classList.remove('sel-si','sel-no','sel-gen');
+  });
+  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('f-mes').value = meses[new Date().getMonth()];
+  document.getElementById('f-fecha-llamada').value = new Date().toISOString().split('T')[0];
+}
+
+/* ═══════════════════════════════════════════
+   VERIFICAR VISITA REPETIDA
+═══════════════════════════════════════════ */
+function verificarVisitaRepetida() {
+  const nombre = document.getElementById('f-nombre').value.trim().toLowerCase();
+  const tipoSel = document.getElementById('f-tipo-visita').value;
+  const warn = document.getElementById('visita-warning');
+  if (!nombre || tipoSel !== '1era Visita') { warn.style.display='none'; return; }
+  // Buscar si ya existe una 1era Visita para este cliente en mis registros
+  const yaExiste = misRegs.some(r =>
+    r.nombre && r.nombre.toLowerCase() === nombre && r.tipoVisita === '1era Visita'
+  );
+  warn.style.display = yaExiste ? 'block' : 'none';
+}
+
+/* ═══════════════════════════════════════════
+   MIS REGISTROS (vista asesor)
+═══════════════════════════════════════════ */
+function estadoBadgeClass(estado) {
+  const m = {
+    'Contrato':'badge-contrato','EN TRAMITACIÓN BANCARIA':'badge-tramite',
+    'En Tramitación Bancaria':'badge-tramite','Reserva':'badge-reserva',
+    'Seguimiento':'badge-seguim','Descartado':'badge-descartado',
+    'Agenda':'badge-seguim','Entrega':'badge-entrega',
+    'Coordinación Firma':'badge-firma','Desistido':'badge-desistido'
+  };
+  return 'badge ' + (m[estado]||'badge-def');
+}
+
+function renderMisRegistros() {
+  const cont = document.getElementById('mis-reg-list');
+  if (!misRegs.length) {
+    cont.innerHTML = '<div class="empty-state">Todavía no cargaste ningún registro.<br>Usá la pestaña "Cargar registro" para empezar.</div>';
+    return;
+  }
+  cont.innerHTML = misRegs.map(r => `
+    <div class="reg-card">
+      <div class="reg-card-top">
+        <div>
+          <div class="reg-cliente">${r.nombre || '—'}</div>
+          <div class="reg-fecha">${r.fechaCarga || ''}</div>
+        </div>
+        <span class="${estadoBadgeClass(r.estado)}">${r.estado||'Sin estado'}</span>
+      </div>
+      <div class="reg-pills">
+        ${r.tipoVisita ? `<span class="badge badge-def">${r.tipoVisita}</span>` : ''}
+        ${r.unidad     ? `<span class="badge badge-bbdd">${r.unidad}</span>` : ''}
+        ${r.formaPago  ? `<span class="badge badge-def">${r.formaPago}</span>` : ''}
+        ${r.conclusion ? `<span class="badge badge-def">${r.conclusion}</span>` : ''}
+        ${r.expectativa? `<span class="badge badge-def">Expectativa: ${r.expectativa}</span>` : ''}
+      </div>
+      ${r.comentarios ? `<div class="reg-comentario">"${r.comentarios}"</div>` : ''}
+    </div>`).join('');
+}
+
+/* ═══════════════════════════════════════════
+   DASHBOARD ADMIN
+═══════════════════════════════════════════ */
+function renderDashboard() {
+  const mes = new Date().toLocaleString('es-BO',{month:'long'}).charAt(0).toUpperCase()
+    + new Date().toLocaleString('es-BO',{month:'long'}).slice(1);
+  const vMes = todosRegs.filter(r => r.mes === mes);
+
+  // KPIs generales
+  document.getElementById('kpi-total').textContent     = todosRegs.length;
+  document.getElementById('kpi-total-sub').textContent = `${asesores.length} asesor${asesores.length!==1?'es':''}`;
+  document.getElementById('kpi-mes').textContent       = vMes.length;
+  document.getElementById('kpi-mes-sub').textContent   = `registros en ${mes}`;
+
+  const contratosReservas = todosRegs.filter(r =>
+    ['Contrato','Reserva','Coordinación Firma','Entrega','En Tramitación Bancaria'].includes(r.estado));
+  document.getElementById('kpi-contratos').textContent = contratosReservas.length;
+  document.getElementById('kpi-contratos-sub').textContent =
+    todosRegs.length ? `${Math.round(contratosReservas.length/todosRegs.length*100)}% del total` : '—';
+
+  const conPrecio = todosRegs.filter(r => r.precio > 0);
+  const totalPrecio = conPrecio.reduce((s,r)=>s+(r.precio||0),0);
+  document.getElementById('kpi-precio').textContent =
+    totalPrecio ? '$' + totalPrecio.toLocaleString('es-BO') : '—';
+  document.getElementById('kpi-precio-sub').textContent = `${conPrecio.length} registros con precio`;
+
+  // Funnel de conversión (mes actual)
+  const agendadas     = vMes.filter(r => r.fechaAgenda).length;
+  const concretadas   = vMes.filter(r => r.visitaConcretada === 'SI').length;
+  const conCierre     = vMes.filter(r => r.huboCierre === 'SI').length;
+  const conv1 = agendadas ? Math.round(concretadas/agendadas*100) : 0;
+  const conv2 = concretadas ? Math.round(conCierre/concretadas*100) : 0;
+
+  const funnelEl = document.getElementById('chart-funnel');
+  if (funnelEl) {
+    const funnelData = [
+      { label:'Agendadas', n:agendadas, color:'#2563eb' },
+      { label:'Visitas concretadas', n:concretadas, color:'#d97706', pct:conv1 },
+      { label:'Con cierre', n:conCierre, color:'#2d5a27', pct:conv2 },
+    ];
+    const maxF = Math.max(...funnelData.map(f=>f.n), 1);
+    funnelEl.innerHTML = funnelData.map(f => `
+      <div class="bar-item">
+        <div class="bar-label">
+          <span>${f.label}</span>
+          <span><strong>${f.n}</strong>${f.pct!==undefined ? ` <span style="color:${f.color};font-size:11px;">(${f.pct}%)</span>` : ''}</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${f.n/maxF*100}%;background:${f.color};"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  // Visitas por número (1era, 2da, 3era)
+  const visitasTipo = {};
+  vMes.filter(r=>r.tipoVisita).forEach(r => visitasTipo[r.tipoVisita]=(visitasTipo[r.tipoVisita]||0)+1);
+  const visitasEl = document.getElementById('chart-visitas');
+  if (visitasEl) {
+    const maxV = Math.max(...Object.values(visitasTipo),1);
+    const colV = {'1era Visita':'#2563eb','2da Visita':'#d97706','3era Visita':'#7c3aed','Re-Agenda':'#dc2626','Reunión Virtual':'#059669'};
+    visitasEl.innerHTML = Object.entries(visitasTipo).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`
+      <div class="bar-item">
+        <div class="bar-label"><span>${k}</span><span>${n}</span></div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${n/maxV*100}%;background:${colV[k]||'#6b7280'};"></div>
+        </div>
+      </div>`).join('') || '<p style="font-size:13px;color:#9ca3af;">Sin datos este mes.</p>';
+  }
+
+  /* Chart asesores */
+  const asesorCounts = {};
+  vMes.forEach(r => asesorCounts[r.asesorNombre]=(asesorCounts[r.asesorNombre]||0)+1);
+  const maxA = Math.max(...Object.values(asesorCounts),1);
+  const colores = ['#2d5a27','#4a8c3f','#2563eb','#d97706','#7c3aed','#dc2626'];
+  document.getElementById('chart-asesores').innerHTML =
+    Object.entries(asesorCounts).sort((a,b)=>b[1]-a[1]).map(([k,n],i)=>`
+      <div class="bar-item">
+        <div class="bar-label"><span>${k}</span><span>${n}</span></div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${n/maxA*100}%;background:${colores[i%colores.length]};"></div>
+        </div>
+      </div>`).join('') || '<p style="font-size:13px;color:#9ca3af;">Sin datos este mes.</p>';
+
+  /* Chart estados */
+  const estadoCounts = {};
+  todosRegs.forEach(r => estadoCounts[r.estado||'Sin estado']=(estadoCounts[r.estado||'Sin estado']||0)+1);
+  const maxE = Math.max(...Object.values(estadoCounts),1);
+  document.getElementById('chart-estados').innerHTML =
+    Object.entries(estadoCounts).sort((a,b)=>b[1]-a[1]).map(([k,n],i)=>`
+      <div class="bar-item">
+        <div class="bar-label"><span>${k}</span><span>${n}</span></div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${n/maxE*100}%;background:${colores[i%colores.length]};"></div>
+        </div>
+      </div>`).join('') || '<p style="font-size:13px;color:#9ca3af;">Sin datos.</p>';
+
+  /* Perfil de cierre */
+  const perfilEl = document.getElementById('chart-perfil');
+  const fields = [
+    {label:'Le gustó', key:'leGusto'},
+    {label:'Puede pagar', key:'puedePagar'},
+    {label:'Puede decidir', key:'puedeDecidir'}
+  ];
+  const total = vMes.length || 1;
+  perfilEl.innerHTML = fields.map(f => {
+    const si = vMes.filter(r=>r[f.key]==='SI').length;
+    const pct = Math.round(si/total*100);
+    return `<div style="text-align:center;">
+      <div style="font-size:28px;font-weight:700;color:var(--verde);font-family:'Cormorant Garamond',serif;">${pct}%</div>
+      <div style="font-size:11px;color:var(--gris);margin-top:2px;">${f.label}</div>
+      <div style="font-size:12px;color:#374151;margin-top:2px;">${si}/${vMes.length}</div>
+    </div>`;
+  }).join('');
+
+  /* Chart forma pago */
+  const pagoCounts = {};
+  todosRegs.filter(r=>r.formaPago).forEach(r => pagoCounts[r.formaPago]=(pagoCounts[r.formaPago]||0)+1);
+  const maxP = Math.max(...Object.values(pagoCounts),1);
+  document.getElementById('chart-pago').innerHTML =
+    Object.entries(pagoCounts).sort((a,b)=>b[1]-a[1]).map(([k,n],i)=>`
+      <div class="bar-item">
+        <div class="bar-label"><span>${k}</span><span>${n}</span></div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${n/maxP*100}%;background:${colores[i%colores.length]};"></div>
+        </div>
+      </div>`).join('') || '<p style="font-size:13px;color:#9ca3af;">Sin datos.</p>';
+}
+
+/* ═══════════════════════════════════════════
+   TABLA ADMIN
+═══════════════════════════════════════════ */
+function poblarFiltroAsesor() {
+  const sel = document.getElementById('fil-asesor');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>';
+  const nombres = [...new Set(todosRegs.map(r=>r.asesorNombre))].sort();
+  nombres.forEach(n => {
+    const o = document.createElement('option');
+    o.value = o.textContent = n;
+    if (n===cur) o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+function filtradosAdmin() {
+  const fa = document.getElementById('fil-asesor').value;
+  const fe = document.getElementById('fil-estado').value;
+  const fm = document.getElementById('fil-mes').value;
+  const fc = document.getElementById('fil-conclusion').value;
+  return todosRegs.filter(r => {
+    if (fa && r.asesorNombre !== fa) return false;
+    if (fe && r.estado !== fe) return false;
+    if (fm && r.mes !== fm) return false;
+    if (fc && r.conclusion !== fc) return false;
+    return true;
+  });
+}
+
+function renderTablaAdmin() {
+  const datos = filtradosAdmin();
+  const tb = document.getElementById('tabla-admin-body');
+  if (!datos.length) {
+    tb.innerHTML = '<tr><td colspan="20" class="empty-state">Sin registros con los filtros aplicados.</td></tr>';
+    return;
+  }
+  tb.innerHTML = datos.map(r => `
+    <tr>
+      <td style="font-size:12px;color:#9ca3af;white-space:nowrap;">${r.fechaCarga||''}</td>
+      <td><strong>${r.asesorNombre||'—'}</strong></td>
+      <td>${r.nombre||'—'}</td>
+      <td style="font-size:12px;">${r.telefono||''}</td>
+      <td style="font-size:12px;">${r.procedencia||''}</td>
+      <td style="font-size:12px;">${r.gestion||''}</td>
+      <td style="font-size:12px;">${r.mes||''}</td>
+      <td style="font-size:12px;font-weight:600;">${r.tipoVisita||''}</td>
+      <td style="font-size:12px;">${r.fechaAgenda||''}</td>
+      <td style="font-size:12px;">${r.horaAgenda||''}</td>
+      <td style="text-align:center;">${r.visitaConcretada ? concretadaBadge(r.visitaConcretada) : ''}</td>
+      <td style="font-size:12px;">${r.fechaVisita||''}</td>
+      <td style="font-size:12px;">${r.show||''}</td>
+      <td style="font-size:12px;">${r.linea||''}</td>
+      <td style="font-size:12px;">${r.cierre||''}</td>
+      <td style="text-align:center;">${r.huboCierre ? yesNo(r.huboCierre) : ''}</td>
+      <td style="font-size:12px;font-weight:600;">${r.unidad||''}</td>
+      <td style="font-size:12px;">${r.precio?'$'+r.precio.toLocaleString('es-BO'):''}</td>
+      <td style="font-size:12px;">${r.formaPago||''}</td>
+      <td style="text-align:center;">${r.leGusto ? yesNo(r.leGusto) : ''}</td>
+      <td style="text-align:center;">${r.puedePagar ? yesNo(r.puedePagar) : ''}</td>
+      <td style="text-align:center;">${r.puedeDecidir ? yesNo(r.puedeDecidir) : ''}</td>
+      <td style="font-size:12px;">${r.expectativa||''}</td>
+      <td style="font-size:12px;">${r.conclusion||''}</td>
+      <td><span class="${estadoBadgeClass(r.estado)}" style="font-size:11px;">${r.estado||'—'}</span></td>
+      <td style="font-size:12px;max-width:200px;color:#6b7280;">${r.comentarios||''}</td>
+      <td><button class="btn-del" onclick="eliminarRegistro('${r._asesorId}','${r._key}')">🗑</button></td>
+    </tr>`).join('');
+}
+
+function yesNo(v) {
+  return v==='SI'
+    ? '<span style="color:#16a34a;font-weight:600;">✓</span>'
+    : '<span style="color:#dc2626;font-weight:600;">✗</span>';
+}
+
+function concretadaBadge(v) {
+  if (v==='SI')       return '<span style="color:#16a34a;font-weight:600;font-size:12px;">✓ Sí</span>';
+  if (v==='NO')       return '<span style="color:#dc2626;font-weight:600;font-size:12px;">✗ No</span>';
+  if (v==='Pendiente')return '<span style="color:#d97706;font-weight:600;font-size:12px;">⏳ Pend.</span>';
+  return '';
+}
+
+function limpiarFiltros() {
+  ['fil-asesor','fil-estado','fil-mes','fil-conclusion'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  renderTablaAdmin();
+}
+
+async function eliminarRegistro(asesorId, key) {
+  if (!confirm('¿Eliminar este registro?')) return;
+  try { await window._fbRemoveRegistro(asesorId, key); }
+  catch(e) { alert('Error al eliminar: ' + e.message); }
+}
+
+/* ═══════════════════════════════════════════
+   EXPORTAR EXCEL
+═══════════════════════════════════════════ */
+function exportarExcel() {
+  const datos = filtradosAdmin();
+  if (!datos.length) { alert('No hay datos para exportar.'); return; }
+  const rows = datos.map(r => ({
+    'Fecha carga':          r.fechaCarga||'',
+    'Asesor':               r.asesorNombre||'',
+    'Nombre cliente':       r.nombre||'',
+    'Teléfono':             r.telefono||'',
+    'Procedencia':          r.procedencia||'',
+    'Gestión':              r.gestion||'',
+    'Mes':                  r.mes||'',
+    'Nº Visita':            r.tipoVisita||'',
+    'Fecha agendada':       r.fechaAgenda||'',
+    'Hora agendada':        r.horaAgenda||'',
+    'Visita concretada':    r.visitaConcretada||'',
+    'Fecha concretada':     r.fechaVisita||'',
+    'Hora concretada':      r.horaVisita||'',
+    'Show de venta':        r.show||'',
+    'Asesor de línea':      r.linea||'',
+    'Asesor de cierre':     r.cierre||'',
+    '¿Hubo cierre?':        r.huboCierre||'',
+    'Unidad':               r.unidad||'',
+    'Precio':               r.precio||'',
+    'Forma de pago':        r.formaPago||'',
+    'Cuota inicial':        r.cuotaInicial||'',
+    'Le gustó':             r.leGusto||'',
+    'Puede pagar':          r.puedePagar||'',
+    'Puede decidir':        r.puedeDecidir||'',
+    'Expectativa':          r.expectativa||'',
+    'Conclusión':           r.conclusion||'',
+    'Estado':               r.estado||'',
+    'TT':                   r.tt||'',
+    'Comentarios':          r.comentarios||''
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Planilla UV');
+  XLSX.writeFile(wb, `urubo_planilla_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+/* ═══════════════════════════════════════════
+   GESTIÓN ASESORES (ADMIN)
+═══════════════════════════════════════════ */
+function renderAsesoresAdmin() {
+  const cont = document.getElementById('asesores-list');
+  document.getElementById('asesores-count').textContent =
+    `${asesores.length} asesor${asesores.length!==1?'es':''}`;
+  if (!asesores.length) {
+    cont.innerHTML = '<div class="empty-state">No hay asesores.</div>';
+    return;
+  }
+  const mes = new Date().toLocaleString('es-BO',{month:'long'}).charAt(0).toUpperCase()
+    + new Date().toLocaleString('es-BO',{month:'long'}).slice(1);
+  const cuentas = {};
+  todosRegs.filter(r=>r.mes===mes).forEach(r =>
+    cuentas[r.asesorNombre]=(cuentas[r.asesorNombre]||0)+1);
+
+  cont.innerHTML = asesores.map(a => `
+    <div class="vendor-item">
+      <div>
+        <span class="v-name">${a.nombre}</span>
+        <span class="v-pin" style="margin-left:10px;">PIN: ${'•'.repeat(a.pin?.length||4)}</span>
+      </div>
+      <div class="vendor-actions">
+        <span class="v-count">${cuentas[a.nombre]||0} registros este mes</span>
+        <button class="btn-remove-vendor" onclick="eliminarAsesor('${a._key}','${a.nombre}')" title="Eliminar">×</button>
+      </div>
+    </div>`).join('');
+}
+
+async function agregarAsesor() {
+  const nombre = document.getElementById('new-asesor-name').value.trim();
+  const pin    = document.getElementById('new-asesor-pin').value.trim();
+  if (!nombre) { alert('Ingresá el nombre del asesor.'); return; }
+  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { alert('El PIN debe ser de 4 dígitos numéricos.'); return; }
+  if (asesores.some(a=>a.nombre.toLowerCase()===nombre.toLowerCase())) {
+    alert('Ya existe un asesor con ese nombre.'); return;
+  }
+  await window._fbAddAsesor(nombre, pin);
+  document.getElementById('new-asesor-name').value = '';
+  document.getElementById('new-asesor-pin').value  = '';
+}
+
+async function eliminarAsesor(key, nombre) {
+  if (!confirm(`¿Eliminar al asesor "${nombre}"?\nSus registros se conservarán en Firebase.`)) return;
+  await window._fbRemoveAsesor(key);
+}
+
+/* ═══════════════════════════════════════════
+   PIN ADMIN
+═══════════════════════════════════════════ */
+function cambiarPinAdmin() {
+  const np = document.getElementById('new-admin-pin').value.trim();
+  const msg = document.getElementById('pin-change-msg');
+  if (np.length !== 4 || !/^\d{4}$/.test(np)) {
+    msg.style.display='block'; msg.style.color='var(--rojo)';
+    msg.textContent='El PIN debe ser exactamente 4 dígitos.'; return;
+  }
+  pinAdminLocal = np;
+  localStorage.setItem('uv_planilla_pin', np);
+  msg.style.display='block'; msg.style.color='var(--verde)';
+  msg.textContent='✓ PIN guardado correctamente.';
+  document.getElementById('new-admin-pin').value='';
+  setTimeout(()=>msg.style.display='none', 3000);
+}
+
+/* ═══════════════════════════════════════════
+   INVENTARIO DE LOTES
+═══════════════════════════════════════════ */
+let todosLotes = [];
+let loteEditKey = null;
+
+/* Escuchar lotes cuando entra admin */
+function iniciarInventario() {
+  window._fbListenLotes(arr => {
+    todosLotes = arr;
+    renderInventario();
+    renderInvStats();
+    recalcularPrecios();
+  });
+}
+
+function renderInvStats() {
+  document.getElementById('inv-total').textContent       = todosLotes.length;
+  document.getElementById('inv-disponibles').textContent = todosLotes.filter(l=>l.estado==='Disponible').length;
+  document.getElementById('inv-reservados').textContent  = todosLotes.filter(l=>l.estado==='Reservado').length;
+  document.getElementById('inv-vendidos').textContent    = todosLotes.filter(l=>l.estado==='Vendido').length;
+}
+
+function renderInventario() {
+  const filtroEst = document.getElementById('fil-inv-estado')?.value || '';
+  const datos = filtroEst ? todosLotes.filter(l=>l.estado===filtroEst) : todosLotes;
+  const tb = document.getElementById('inv-tabla-body');
+  if (!tb) return;
+  if (!datos.length) {
+    tb.innerHTML = '<tr><td colspan="11" class="empty-state">Sin lotes registrados todavía.</td></tr>';
+    return;
+  }
+  const tcOf = parseFloat(document.getElementById('tc-oficial')?.value) || 6.96;
+  const tcRef = parseFloat(document.getElementById('tc-referencial')?.value) || 9.50;
+
+  const estadoColor = {
+    'Disponible':    'background:#d1fae5;color:#065f46;',
+    'Reservado':     'background:#fef3c7;color:#92400e;',
+    'Vendido':       'background:#fee2e2;color:#991b1b;',
+    'No disponible': 'background:#f3f4f6;color:#6b7280;'
+  };
+
+  tb.innerHTML = datos.map(l => {
+    const codigo = `${l.uv}-${l.manzano}-${l.lote}`;
+    const precioEnBs   = l.precio ? Math.round(l.precio * tcOf) : 0;
+    const precioRealUSD = (precioEnBs && tcRef) ? (precioEnBs / tcRef) : 0;
+    const precioOf  = precioEnBs  ? precioEnBs.toLocaleString('es-BO')                       : '—';
+    const precioRef = precioRealUSD ? '$' + precioRealUSD.toLocaleString('es-BO', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+    const estStyle  = estadoColor[l.estado] || 'background:#f3f4f6;color:#6b7280;';
+    return `<tr>
+      <td style="font-weight:600;font-family:monospace;font-size:13px;">${codigo}</td>
+      <td style="text-align:center;">${l.uv||''}</td>
+      <td style="text-align:center;">${l.manzano||''}</td>
+      <td style="text-align:center;">${l.lote||''}</td>
+      <td style="text-align:center;">${l.metraje ? l.metraje.toLocaleString('es-BO') + ' m²' : '—'}</td>
+      <td style="font-weight:600;color:#2d5a27;">${l.precio ? '$'+Number(l.precio).toLocaleString('es-BO') : '—'}</td>
+      <td style="font-size:12px;color:#374151;">Bs. ${precioOf}</td>
+      <td style="font-size:12px;color:#2d5a27;font-weight:600;">${precioRef}</td>
+      <td><span style="padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;${estStyle}">${l.estado||'—'}</span></td>
+      <td style="font-size:12px;color:#6b7280;">${l.obs||''}</td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          <button class="btn-clear" style="padding:4px 10px;font-size:12px;" onclick="editarLote('${l._key}')">✏️</button>
+          <button class="btn-del" onclick="eliminarLote('${l._key}','${codigo}')">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function recalcularPrecios() {
+  // Recalcular en tabla
+  renderInventario();
+  // Recalcular en formulario si hay precio ingresado
+  previsualizarCambio();
+}
+
+function previsualizarCambio() {
+  const precio = parseFloat(document.getElementById('l-precio')?.value) || 0;
+  const tcOf   = parseFloat(document.getElementById('tc-oficial')?.value) || 6.96;
+  const tcRef  = parseFloat(document.getElementById('tc-referencial')?.value) || 9.50;
+  const elOf  = document.getElementById('l-precio-oficial');
+  const elRef = document.getElementById('l-precio-ref');
+  const enBs  = precio ? Math.round(precio * tcOf) : 0;
+  const realUSD = (enBs && tcRef) ? parseFloat((enBs / tcRef).toFixed(2)) : 0;
+  if (elOf)  elOf.value  = enBs    ? enBs    : '';
+  if (elRef) elRef.value = realUSD ? realUSD : '';
+}
+
+function mostrarFormLote() {
+  loteEditKey = null;
+  document.getElementById('form-lote-title').textContent = 'Agregar lote';
+  document.getElementById('btn-guardar-lote').textContent = 'Guardar lote';
+  ['l-uv','l-manzano','l-lote','l-metraje','l-precio','l-precio-oficial','l-precio-ref','l-obs'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('l-estado').value = '';
+  document.getElementById('form-lote').style.display = 'block';
+  document.getElementById('form-lote').scrollIntoView({ behavior:'smooth' });
+}
+
+function cancelarFormLote() {
+  loteEditKey = null;
+  document.getElementById('form-lote').style.display = 'none';
+}
+
+function editarLote(key) {
+  const lote = todosLotes.find(l => l._key === key);
+  if (!lote) return;
+  loteEditKey = key;
+  document.getElementById('form-lote-title').textContent  = 'Editar lote';
+  document.getElementById('btn-guardar-lote').textContent = 'Actualizar lote';
+  document.getElementById('l-uv').value       = lote.uv      || '';
+  document.getElementById('l-manzano').value  = lote.manzano || '';
+  document.getElementById('l-lote').value     = lote.lote    || '';
+  document.getElementById('l-metraje').value  = lote.metraje || '';
+  document.getElementById('l-precio').value   = lote.precio  || '';
+  document.getElementById('l-estado').value   = lote.estado  || '';
+  document.getElementById('l-obs').value      = lote.obs     || '';
+  previsualizarCambio();
+  document.getElementById('form-lote').style.display = 'block';
+  document.getElementById('form-lote').scrollIntoView({ behavior:'smooth' });
+}
+
+async function guardarLote() {
+  const uv      = parseInt(document.getElementById('l-uv').value);
+  const manzano = parseInt(document.getElementById('l-manzano').value);
+  const lote    = parseInt(document.getElementById('l-lote').value);
+  if (!uv || !manzano || !lote) {
+    alert('UV, Manzano y Lote son obligatorios.'); return;
+  }
+  const tcOf  = parseFloat(document.getElementById('tc-oficial').value)      || 6.96;
+  const tcRef = parseFloat(document.getElementById('tc-referencial').value)   || 9.50;
+  const precio = parseFloat(document.getElementById('l-precio').value) || 0;
+
+  const data = {
+    uv,
+    manzano,
+    lote,
+    codigo:       `${uv}-${manzano}-${lote}`,
+    metraje:      parseFloat(document.getElementById('l-metraje').value) || 0,
+    precio,
+    precioEnBs:       precio ? Math.round(precio * tcOf)  : 0,
+    precioRealUSD:    precio ? parseFloat((Math.round(precio * tcOf) / tcRef).toFixed(2)) : 0,
+    tcOficial:    tcOf,
+    tcReferencial:tcRef,
+    estado:       document.getElementById('l-estado').value || 'Disponible',
+    obs:          document.getElementById('l-obs').value.trim(),
+    updatedAt:    new Date().toLocaleString('es-BO'),
+  };
+
+  try {
+    if (loteEditKey) {
+      await window._fbUpdateLote(loteEditKey, data);
+    } else {
+      await window._fbAddLote(data);
+    }
+    cancelarFormLote();
+  } catch(e) { alert('Error al guardar: ' + e.message); }
+}
+
+async function eliminarLote(key, codigo) {
+  if (!confirm(`¿Eliminar el lote ${codigo}?`)) return;
+  try { await window._fbRemoveLote(key); }
+  catch(e) { alert('Error: ' + e.message); }
+}
+
+function exportarInventario() {
+  if (!todosLotes.length) { alert('No hay lotes en el inventario.'); return; }
+  const tcOf  = parseFloat(document.getElementById('tc-oficial')?.value)  || 6.96;
+  const tcRef = parseFloat(document.getElementById('tc-referencial')?.value) || 9.50;
+  const rows = todosLotes.map(l => ({
+    'Código':               `${l.uv}-${l.manzano}-${l.lote}`,
+    'UV':                   l.uv||'',
+    'Manzano':              l.manzano||'',
+    'Lote':                 l.lote||'',
+    'Metraje (m²)':         l.metraje||'',
+    'Precio ($)':           l.precio||'',
+    [`Precio en Bs. (oficial @${tcOf})`]:   l.precio ? Math.round(l.precio*tcOf) : '',
+    [`Precio real en $ (ref. @${tcRef})`]:  l.precio ? parseFloat((Math.round(l.precio*tcOf)/tcRef).toFixed(2)) : '',
+    'Estado':               l.estado||'',
+    'Observaciones':        l.obs||'',
+    'Última actualización': l.updatedAt||'',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventario UV');
+  XLSX.writeFile(wb, `inventario_urubo_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+/* ═══════════════════════════════════════════
+   MÓDULO COBRANZA — VARIABLES GLOBALES
+═══════════════════════════════════════════ */
+let datosCartera   = [];   // datos crudos de Orange
+let datosExpensas  = [];
+let clientesAgrup  = [];   // clientes agrupados por CodigoPago
+let estadosGestion = [];   // estados dinámicos de Firebase
+let estadosCliente = {};   // {codigoPago: {estadoKey, estadoNombre, ...}}
+let clienteActivo  = null; // cliente abierto en el slide panel
+let metaTipoActivo = '';   // 'cartera' o 'expensas'
+const API_BASE = 'http://urubovillage.sistemas.com.bo/api_dashboard.php?Token=48dfdd9b91be80ae8bea753cae3da126';
+
+/* ═══════════════════════════════════════════
+   CARGAR DATOS ORANGE — CARTERA
+═══════════════════════════════════════════ */
+async function cargarCartera() {
+  document.getElementById('cob-lista').innerHTML =
+    '<div class="loading-spin"><div class="spinner"></div><br>Conectando con Orange...</div>';
+  try {
+    const resp = await fetch(`${API_BASE}&Operation=GetCartera&Ordenar=ascendente`);
+    const json = await resp.json();
+    datosCartera = json.data || [];
+    clientesAgrup = agruparPorCliente(datosCartera);
+    renderCarteraKPIs();
+    poblarFiltroAsesoresCob();
+    renderCartera();
+    calcularMontoCobrado('cartera');
+    renderHome();
+  } catch(e) {
+    document.getElementById('cob-lista').innerHTML =
+      `<div class="empty-state" style="color:var(--rojo);">Error al conectar con Orange.<br><small>${e.message}</small></div>`;
+  }
+}
+
+async function cargarExpensas() {
+  document.getElementById('exp-lista').innerHTML =
+    '<div class="loading-spin"><div class="spinner"></div><br>Conectando con Orange...</div>';
+  try {
+    const resp = await fetch(`${API_BASE}&Operation=GetExpensas&Ordenar=ascendente`);
+    const json = await resp.json();
+    datosExpensas = json.data || [];
+    renderExpensas();
+    calcularMontoCobrado('expensas');
+  } catch(e) {
+    document.getElementById('exp-lista').innerHTML =
+      `<div class="empty-state" style="color:var(--rojo);">Error al conectar con Orange.<br><small>${e.message}</small></div>`;
+  }
+}
+
+/* Agrupa las filas por CodigoPago (un cliente puede tener N cuotas) */
+function agruparPorCliente(data) {
+  const map = {};
+  data.forEach(row => {
+    const key = row.CodigoPago || row.Terreno;
+    if (!map[key]) {
+      map[key] = {
+        CodigoPago:     key,
+        NombreCliente:  row.NombreCliente,
+        Terreno:        row.Terreno,
+        Asesor:         row.Asesor,
+        Modulo:         row.Modulo,
+        Modalidad:      row.Modalidad,
+        cuotas:         [],
+        deudaTotal:     0,
+        diasMoraMax:    0,
+        estadosPago:    new Set(),
+      };
+    }
+    map[key].cuotas.push(row);
+    map[key].deudaTotal += (row.CobranzaTerreno || 0) + (row.CobranzaAccion || 0);
+    map[key].diasMoraMax = Math.max(map[key].diasMoraMax, row.DiasMoraTerreno || 0, row.DiasMoraAccion || 0);
+    if (row.EstadoPago) map[key].estadosPago.add(row.EstadoPago);
+  });
+  return Object.values(map);
+}
+
+/* Determina el estado dominante del cliente */
+function estadoDominanteCliente(c) {
+  if (c.estadosPago.has('Mora'))           return 'Mora';
+  if (c.estadosPago.has('Vigente'))        return 'Vigente';
+  if (c.estadosPago.has('Pago Adelantado'))return 'Pago Adelantado';
+  return 'Sin estado';
+}
+
+/* ═══════════════════════════════════════════
+   KPIs CARTERA
+═══════════════════════════════════════════ */
+function renderCarteraKPIs() {
+  const mora       = clientesAgrup.filter(c => estadoDominanteCliente(c) === 'Mora');
+  const vigente    = clientesAgrup.filter(c => estadoDominanteCliente(c) === 'Vigente');
+  const adelantado = clientesAgrup.filter(c => estadoDominanteCliente(c) === 'Pago Adelantado');
+
+  document.getElementById('ck-total').textContent     = clientesAgrup.length;
+  document.getElementById('ck-total-sub').textContent = 'clientes activos';
+  document.getElementById('ck-mora').textContent      = mora.length;
+  document.getElementById('ck-mora-sub').textContent  = `Bs. ${mora.reduce((s,c)=>s+c.deudaTotal,0).toLocaleString('es-BO',{maximumFractionDigits:0})} pendientes`;
+  document.getElementById('ck-vigente').textContent   = vigente.length;
+  document.getElementById('ck-adelantado').textContent= adelantado.length;
+}
+
+/* ═══════════════════════════════════════════
+   RENDER LISTA CLIENTES CARTERA
+═══════════════════════════════════════════ */
+function renderCartera() {
+  const buscar   = (document.getElementById('cob-buscar')?.value || '').toLowerCase();
+  const filAsesor= document.getElementById('cob-fil-asesor')?.value  || '';
+  const filEstPago= document.getElementById('cob-fil-estado-pago')?.value || '';
+  const filEstGest= document.getElementById('cob-fil-estado-gestion')?.value || '';
+  const filMes   = document.getElementById('cob-fil-mes')?.value || '';
+
+  let lista = clientesAgrup.filter(c => {
+    if (buscar && !c.NombreCliente?.toLowerCase().includes(buscar) && !c.Terreno?.toLowerCase().includes(buscar)) return false;
+    if (filAsesor && c.Asesor !== filAsesor) return false;
+    if (filEstPago && estadoDominanteCliente(c) !== filEstPago) return false;
+    if (filMes && !c.cuotas.some(q => q.Mes === filMes)) return false;
+    if (filEstGest) {
+      const est = estadosCliente[c.CodigoPago];
+      if (!est || est.estadoNombre !== filEstGest) return false;
+    }
+    return true;
+  });
+
+  // Ordenar: mora primero, luego por días mora desc
+  lista.sort((a,b) => {
+    const pa = estadoDominanteCliente(a) === 'Mora' ? 0 : 1;
+    const pb = estadoDominanteCliente(b) === 'Mora' ? 0 : 1;
+    if (pa !== pb) return pa - pb;
+    return b.diasMoraMax - a.diasMoraMax;
+  });
+
+  const cont = document.getElementById('cob-lista');
+  if (!lista.length) {
+    cont.innerHTML = '<div class="empty-state">Sin clientes con los filtros aplicados.</div>';
+    return;
+  }
+
+  const colorEstado = { 'Mora':'#ef4444', 'Vigente':'#10b981', 'Pago Adelantado':'#3b82f6' };
+
+  cont.innerHTML = lista.map(c => {
+    const est = estadoDominanteCliente(c);
+    const color = colorEstado[est] || '#6b7280';
+    const gestEst = estadosCliente[c.CodigoPago];
+    const gestBadge = gestEst
+      ? `<span class="estado-pill" style="background:${gestEst.color}22;color:${gestEst.color};border:1px solid ${gestEst.color}44;">${gestEst.icono||''} ${gestEst.estadoNombre}</span>`
+      : `<span class="estado-pill" style="background:#f3f4f6;color:#9ca3af;">Sin gestión</span>`;
+
+    return `
+    <div class="cliente-row ${est.toLowerCase().replace(' ','-')}" onclick="abrirCliente('${c.CodigoPago}')">
+      <div class="cli-avatar" style="background:${color};">${iniciales(c.NombreCliente)}</div>
+      <div class="cli-info">
+        <div class="cli-nombre">${c.NombreCliente || '—'}</div>
+        <div class="cli-sub">${c.Terreno} · ${c.Asesor} · ${c.Modulo}</div>
+        <div style="margin-top:5px; display:flex; gap:6px; flex-wrap:wrap;">
+          <span class="estado-pill" style="background:${color}22;color:${color};border:1px solid ${color}44;">${est}</span>
+          ${c.diasMoraMax > 0 ? `<span class="estado-pill" style="background:#fef3c7;color:#92400e;">⏱ ${c.diasMoraMax} días mora</span>` : ''}
+          ${gestBadge}
+        </div>
+      </div>
+      <div class="cli-monto">
+        <div class="cli-monto-val">Bs. ${c.deudaTotal.toLocaleString('es-BO',{maximumFractionDigits:0})}</div>
+        <div class="cli-monto-label">${c.cuotas.length} cuota${c.cuotas.length!==1?'s':''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function poblarFiltroAsesoresCob() {
+  const sel = document.getElementById('cob-fil-asesor');
+  if (!sel) return;
+  const asrs = [...new Set(datosCartera.map(r=>r.Asesor).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los asesores</option>' +
+    asrs.map(a => `<option>${a}</option>`).join('');
+}
+
+/* ═══════════════════════════════════════════
+   PANEL LATERAL — CLIENTE DETALLE
+═══════════════════════════════════════════ */
+function abrirCliente(codigoPago) {
+  const c = clientesAgrup.find(x => x.CodigoPago === codigoPago);
+  if (!c) return;
+  clienteActivo = c;
+
+  document.getElementById('sp-nombre').textContent  = c.NombreCliente;
+  document.getElementById('sp-sub').textContent     = `${c.Terreno} · ${c.Asesor} · ${c.Modulo}`;
+  document.getElementById('sp-deuda').textContent   = 'Bs. ' + c.deudaTotal.toLocaleString('es-BO',{maximumFractionDigits:0});
+  document.getElementById('sp-dias').textContent    = c.diasMoraMax > 0 ? c.diasMoraMax + 'd' : '—';
+  document.getElementById('sp-cuotas').textContent  = c.cuotas.length;
+
+  // Render botones de estado
+  renderEstadosBtns(codigoPago);
+
+  // Render cuotas
+  const cuotasCont = document.getElementById('sp-cuotas-list');
+  cuotasCont.innerHTML = c.cuotas.slice(0, 15).map(q => {
+    const monto = (q.CobranzaTerreno || 0) + (q.CobranzaAccion || 0);
+    const estColor = q.EstadoPago === 'Mora' ? 'cuota-mora' : q.EstadoPago === 'Pago Adelantado' ? 'cuota-adelantado' : 'cuota-vigente';
+    return `<div class="cuota-item ${estColor}">
+      <div><strong>${q.TipoPago}</strong> · ${q.Mes||''} ${q.Anio||''}</div>
+      <div><strong>Bs. ${monto.toLocaleString('es-BO',{maximumFractionDigits:0})}</strong> · <span style="font-size:11px;">${q.EstadoPago}</span></div>
+    </div>`;
+  }).join('') + (c.cuotas.length > 15 ? `<div style="text-align:center;font-size:12px;color:var(--gris);padding:8px;">... y ${c.cuotas.length-15} cuota${c.cuotas.length-15!==1?'s':''} más</div>` : '');
+
+  // Historial Firebase
+  window._fbListenGestiones(codigoPago, gestiones => {
+    const hist = document.getElementById('sp-historial');
+    if (!gestiones.length) {
+      hist.innerHTML = '<div class="empty-state" style="padding:20px;">Sin gestiones registradas aún.</div>';
+      return;
+    }
+    hist.innerHTML = gestiones.map(g => {
+      const d = new Date(g.ts).toLocaleDateString('es-BO', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const estObj = estadosGestion.find(e=>e._key===g.estadoKey) || {};
+      return `<div class="gestion-item">
+        <div class="gestion-dot" style="background:${estObj.color||'#6b7280'};"></div>
+        <div class="gestion-content">
+          <div class="gestion-estado">${estObj.icono||''} ${g.estadoNombre}</div>
+          ${g.nota ? `<div class="gestion-nota">${g.nota}</div>` : ''}
+          <div class="gestion-meta">${d} · ${g.usuario||'Admin'}</div>
+        </div>
+      </div>`;
+    }).join('');
+  });
+
+  // Nota vacía
+  document.getElementById('sp-nota').value = '';
+
+  document.getElementById('slide-panel').classList.add('open');
+  document.getElementById('slide-overlay').classList.add('open');
+}
+
+function cerrarSlide() {
+  document.getElementById('slide-panel').classList.remove('open');
+  document.getElementById('slide-overlay').classList.remove('open');
+  clienteActivo = null;
+}
+
+function renderEstadosBtns(codigoPago) {
+  const cont  = document.getElementById('sp-estados-btns');
+  const actual = estadosCliente[codigoPago];
+  cont.innerHTML = estadosGestion.map(e => {
+    const sel = actual && actual.estadoKey === e._key;
+    return `<button class="estado-opt-btn ${sel?'selected':''}"
+      style="border-color:${sel?e.color:'#e5e7eb'};background:${sel?e.color+'18':'#fff'};color:${sel?e.color:'#374151'};"
+      onclick="seleccionarEstadoBtn('${e._key}',this)"
+      data-key="${e._key}" data-nombre="${e.nombre}" data-color="${e.color}" data-icono="${e.icono||''}">
+      <span>${e.icono||''}</span><span>${e.nombre}</span>
+    </button>`;
+  }).join('');
+}
+
+let estadoSelKey = '', estadoSelNombre = '', estadoSelColor = '', estadoSelIcono = '';
+function seleccionarEstadoBtn(key, btn) {
+  document.querySelectorAll('.estado-opt-btn').forEach(b => {
+    b.classList.remove('selected');
+    b.style.borderColor = '#e5e7eb';
+    b.style.background  = '#fff';
+    b.style.color       = '#374151';
+  });
+  estadoSelKey    = key;
+  estadoSelNombre = btn.dataset.nombre;
+  estadoSelColor  = btn.dataset.color;
+  estadoSelIcono  = btn.dataset.icono;
+  btn.classList.add('selected');
+  btn.style.borderColor = estadoSelColor;
+  btn.style.background  = estadoSelColor + '18';
+  btn.style.color       = estadoSelColor;
+}
+
+async function guardarEstadoCliente() {
+  if (!clienteActivo) return;
+  if (!estadoSelKey) { alert('Seleccioná un estado primero.'); return; }
+  const nota    = document.getElementById('sp-nota').value.trim();
+  const usuario = modoAdmin ? 'Admin' : (asesorActual?.nombre || 'Usuario');
+  const cp      = clienteActivo.CodigoPago;
+
+  try {
+    // Guardar estado actual
+    await window._fbSetEstadoCliente(cp, estadoSelKey, estadoSelNombre, nota, usuario);
+    // Guardar en historial
+    await window._fbPushGestion(cp, { estadoKey: estadoSelKey, estadoNombre: estadoSelNombre, nota, usuario, color: estadoSelColor, icono: estadoSelIcono });
+    // Actualizar local
+    estadosCliente[cp] = { estadoKey: estadoSelKey, estadoNombre: estadoSelNombre, nota, usuario, color: estadoSelColor, icono: estadoSelIcono };
+    renderCartera();
+    document.getElementById('sp-nota').value = '';
+    // Flash de éxito
+    const btn = document.querySelector('.btn-guardar-estado');
+    btn.textContent = '✅ Guardado';
+    btn.style.background = '#10b981';
+    setTimeout(() => { btn.textContent = '✓ Guardar gestión'; btn.style.background=''; }, 2000);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+/* ═══════════════════════════════════════════
+   ESTADOS DINÁMICOS (Config)
+═══════════════════════════════════════════ */
+function renderEstadosConfig() {
+  const cont = document.getElementById('estados-config-list');
+  if (!cont) return;
+  if (!estadosGestion.length) {
+    cont.innerHTML = '<div class="empty-state">Sin estados configurados.</div>';
+    return;
+  }
+  cont.innerHTML = estadosGestion.map(e => `
+    <div class="estado-config-item">
+      <span class="estado-config-icono">${e.icono||'⚪'}</span>
+      <span class="estado-config-nombre">${e.nombre}</span>
+      <span class="estado-config-color" style="background:${e.color};"></span>
+      <span style="font-size:12px;color:var(--gris);font-family:monospace;">${e.color}</span>
+      <button class="btn-del" onclick="eliminarEstado('${e._key}','${e.nombre}')">🗑</button>
+    </div>`).join('');
+
+  // También poblar filtro de gestión en cobranza
+  const filGest = document.getElementById('cob-fil-estado-gestion');
+  if (filGest) {
+    filGest.innerHTML = '<option value="">Todos los estados gestión</option>' +
+      estadosGestion.map(e => `<option>${e.nombre}</option>`).join('');
+  }
+}
+
+async function agregarEstado() {
+  const nombre = document.getElementById('new-estado-nombre').value.trim();
+  const icono  = document.getElementById('new-estado-icono').value.trim() || '⚪';
+  const color  = document.getElementById('new-estado-color').value;
+  if (!nombre) { alert('Ingresá el nombre del estado.'); return; }
+  await window._fbAddEstado(nombre, color, icono);
+  document.getElementById('new-estado-nombre').value = '';
+  document.getElementById('new-estado-icono').value  = '';
+}
+
+async function eliminarEstado(key, nombre) {
+  if (!confirm(`¿Eliminar el estado "${nombre}"?`)) return;
+  await window._fbRemoveEstado(key);
+}
+
+/* ═══════════════════════════════════════════
+   EXPENSAS
+═══════════════════════════════════════════ */
+function renderExpensas() {
+  const buscar  = (document.getElementById('exp-buscar')?.value || '').toLowerCase();
+  const filEst  = document.getElementById('exp-fil-estado')?.value || '';
+
+  let lista = datosExpensas.filter(r => {
+    if (buscar && !r.NombreCliente?.toLowerCase().includes(buscar) &&
+        !(r.Inmueble||r.CodigoPago||'').toLowerCase().includes(buscar)) return false;
+    if (filEst && r.EstadoPago !== filEst) return false;
+    return true;
+  });
+
+  const cont = document.getElementById('exp-lista');
+  if (!lista.length) {
+    cont.innerHTML = '<div class="empty-state">Sin datos con los filtros aplicados.</div>';
+    return;
+  }
+
+  const colorEst = { 'Mora':'#ef4444', 'Vigente':'#10b981', 'Pago Adelantado':'#3b82f6' };
+  const totalCobrado = lista.reduce((s,r) => s + (r.Cobranza_BS||r.CobranzaTerreno||0), 0);
+
+  cont.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#f0fdf4; border-radius:10px; margin-bottom:12px; font-size:13px;">
+    <span style="color:#065f46; font-weight:600;">Total filtrado: ${lista.length} registros</span>
+    <span style="color:#065f46; font-weight:700; font-family:'Cormorant Garamond',serif; font-size:16px;">Bs. ${totalCobrado.toLocaleString('es-BO',{maximumFractionDigits:0})}</span>
+  </div>` +
+  lista.slice(0,100).map(r => {
+    const monto = r.Cobranza_BS || r.CobranzaTerreno || 0;
+    const color = colorEst[r.EstadoPago] || '#6b7280';
+    return `<div class="cliente-row" style="cursor:default;">
+      <div class="cli-avatar" style="background:${color}; font-size:11px;">${(r.Inmueble||r.CodigoPago||'?').slice(-3)}</div>
+      <div class="cli-info">
+        <div class="cli-nombre">${r.NombreCliente || '—'}</div>
+        <div class="cli-sub">${r.Inmueble||r.CodigoPago||''} · ${r.Mes||''} ${r.Anio||''}</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span class="estado-pill" style="background:${color}22;color:${color};border:1px solid ${color}44;">${r.EstadoPago||'—'}</span>
+        <div class="cli-monto">
+          <div class="cli-monto-val">Bs. ${monto.toLocaleString('es-BO',{maximumFractionDigits:0})}</div>
+          ${r.DiasMora||r.DiasMoraTerreno ? `<div class="cli-monto-label">${r.DiasMora||r.DiasMoraTerreno} días mora</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('') + (lista.length > 100 ? `<div class="empty-state" style="padding:16px;">Mostrando primeros 100 de ${lista.length}. Usá los filtros para acotar.</div>` : '');
+}
+
+/* ═══════════════════════════════════════════
+   METAS
+═══════════════════════════════════════════ */
+const MESES_NUM = { 'Enero':1,'Febrero':2,'Marzo':3,'Abril':4,'Mayo':5,'Junio':6,
+  'Julio':7,'Agosto':8,'Septiembre':9,'Octubre':10,'Noviembre':11,'Diciembre':12 };
+
+function mesActual() {
+  return ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][new Date().getMonth()];
+}
+function anioActual() { return new Date().getFullYear(); }
+
+function calcularMontoCobrado(tipo) {
+  const mes  = mesActual();
+  const anio = anioActual();
+  if (tipo === 'cartera') {
+    // Sumar todo lo que aparece en la API del mes actual
+    const cobrado = datosCartera
+      .filter(r => r.Mes === mes && r.Anio === anio)
+      .reduce((s,r) => s + (r.CobranzaTerreno||0) + (r.CobranzaAccion||0), 0);
+    document.getElementById('meta-cob-cobrado').textContent = 'Bs. ' + cobrado.toLocaleString('es-BO',{maximumFractionDigits:0});
+    document.getElementById('meta-cob-periodo').textContent = `${mes} ${anio}`;
+    window._fbListenMetas(anio, mes, metas => {
+      const meta = metas?.cartera?.monto || 0;
+      document.getElementById('meta-cob-val').textContent = meta ? 'Bs. ' + Number(meta).toLocaleString('es-BO') : '— (sin meta)';
+      const pct = meta ? Math.round(cobrado / meta * 100) : 0;
+      document.getElementById('meta-cob-pct').textContent = pct + '%';
+      document.getElementById('meta-cob-pct').style.color = pct >= 100 ? '#10b981' : pct >= 75 ? '#f59e0b' : '#ef4444';
+      document.getElementById('meta-cob-bar').style.width = Math.min(pct,100) + '%';
+      document.getElementById('meta-cob-bar').style.background = pct >= 100 ? 'linear-gradient(90deg,#10b981,#34d399)' : pct >= 75 ? 'linear-gradient(90deg,#f59e0b,#fbbf24)' : 'linear-gradient(90deg,#ef4444,#f87171)';
+      // Actualizar home
+      updateHomeMetas('cartera', cobrado, meta, pct);
+    });
+  } else {
+    const cobrado = datosExpensas
+      .filter(r => r.Mes === mes && r.Anio === anio)
+      .reduce((s,r) => s + (r.Cobranza_BS||r.CobranzaTerreno||0), 0);
+    const props = new Set(datosExpensas.filter(r => r.Mes === mes && r.Anio === anio).map(r=>r.CodigoPago||r.Inmueble)).size;
+    document.getElementById('meta-exp-cobrado').textContent = 'Bs. ' + cobrado.toLocaleString('es-BO',{maximumFractionDigits:0});
+    document.getElementById('meta-exp-props').textContent   = props + ' inmuebles';
+    document.getElementById('meta-exp-periodo').textContent = `${mes} ${anio}`;
+    window._fbListenMetas(anio, mes, metas => {
+      const meta = metas?.expensas?.monto || 0;
+      document.getElementById('meta-exp-val').textContent = meta ? 'Bs. ' + Number(meta).toLocaleString('es-BO') : '— (sin meta)';
+      const pct = meta ? Math.round(cobrado / meta * 100) : 0;
+      document.getElementById('meta-exp-pct').textContent = pct + '%';
+      document.getElementById('meta-exp-pct').style.color = pct >= 100 ? '#10b981' : pct >= 75 ? '#f59e0b' : '#ef4444';
+      document.getElementById('meta-exp-bar').style.width = Math.min(pct,100) + '%';
+      // Actualizar home
+      updateHomeMetas('expensas', cobrado, meta, pct);
+    });
+  }
+}
+
+function abrirModalMeta(tipo) {
+  metaTipoActivo = tipo;
+  document.getElementById('meta-modal-title').textContent =
+    tipo === 'cartera' ? 'Cargar meta — Cartera' : 'Cargar meta — Expensas';
+  document.getElementById('meta-tipo-label').textContent =
+    tipo === 'cartera' ? 'Meta de cobranza cartera (Bs.)' : 'Meta de expensas (Bs.)';
+  document.getElementById('meta-mes-sel').value  = mesActual();
+  document.getElementById('meta-anio-inp').value = anioActual();
+  document.getElementById('meta-monto-inp').value = '';
+  document.getElementById('meta-modal-backdrop').classList.add('open');
+}
+
+function cerrarModalMeta() {
+  document.getElementById('meta-modal-backdrop').classList.remove('open');
+}
+
+async function guardarMeta() {
+  const monto = parseFloat(document.getElementById('meta-monto-inp').value);
+  const mes   = document.getElementById('meta-mes-sel').value;
+  const anio  = parseInt(document.getElementById('meta-anio-inp').value);
+  if (!monto || monto <= 0) { alert('Ingresá un monto válido.'); return; }
+  try {
+    await window._fbSetMeta(anio, mes, metaTipoActivo, monto);
+    cerrarModalMeta();
+    calcularMontoCobrado(metaTipoActivo);
+    // Flash msg
+    alert(`✅ Meta de ${metaTipoActivo} para ${mes} ${anio} guardada: Bs. ${monto.toLocaleString('es-BO')}`);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+/* ═══════════════════════════════════════════
+   SWITCH TAB — helper sin evento
+═══════════════════════════════════════════ */
+function switchAdminTab_btn(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    const match = b.getAttribute('onclick')?.includes(`'${id}'`);
+    b.classList.toggle('active', !!match);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('panel-' + id);
+  if (panel) panel.classList.add('active');
+}
+
+/* ═══════════════════════════════════════════
+   HOME — CENTRO DE COMANDO
+═══════════════════════════════════════════ */
+function renderHome() {
+  // Saludo dinámico
+  const hora = new Date().getHours();
+  const sal = hora < 12 ? 'Buenos días' : hora < 18 ? 'Buenas tardes' : 'Buenas noches';
+  const hoy = new Date().toLocaleDateString('es-BO', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const elSal = document.getElementById('home-saludo');
+  const elFec = document.getElementById('home-fecha');
+  if (elSal) elSal.textContent = sal + ', Jonathan';
+  if (elFec) elFec.textContent = hoy.charAt(0).toUpperCase() + hoy.slice(1);
+
+  // KPIs top
+  const mora     = clientesAgrup.filter(c => estadoDominanteCliente(c) === 'Mora');
+  const vigente  = clientesAgrup.filter(c => estadoDominanteCliente(c) === 'Vigente');
+  const totalDeudaMora = mora.reduce((s,c)=>s+c.deudaTotal,0);
+
+  const hMora    = document.getElementById('h-mora');
+  const hMoraMonto = document.getElementById('h-mora-monto');
+  const hVig     = document.getElementById('h-vigente');
+  const hDisp    = document.getElementById('h-disponibles');
+  if (hMora)      hMora.textContent = mora.length;
+  if (hMoraMonto) hMoraMonto.textContent = 'Bs. ' + totalDeudaMora.toLocaleString('es-BO',{maximumFractionDigits:0}) + ' pendiente';
+  if (hVig)       hVig.textContent  = vigente.length;
+  if (hDisp)      hDisp.textContent = todosLotes.filter(l=>l.estado==='Disponible').length;
+
+  // Badge mora en tab
+  const badge = document.getElementById('badge-mora');
+  if (badge) {
+    badge.textContent = mora.length;
+    badge.style.display = mora.length > 0 ? 'inline-flex' : 'none';
+  }
+
+  // Acciones rápidas subtextos
+  const acMora = document.getElementById('ac-mora-n');
+  const acInv  = document.getElementById('ac-inv-n');
+  const acReg  = document.getElementById('ac-reg-n');
+  const acVen  = document.getElementById('ac-ventas-n');
+  const mes    = mesActual();
+  if (acMora) acMora.textContent = mora.length + ' en mora';
+  if (acInv)  acInv.textContent  = todosLotes.filter(l=>l.estado==='Disponible').length + ' disponibles';
+  if (acReg)  acReg.textContent  = todosRegs.filter(r=>r.mes===mes).length + ' este mes';
+  if (acVen)  acVen.textContent  = todosRegs.filter(r=>r.mes===mes).length + ' registros';
+
+  // Semáforo mora
+  const m60  = mora.filter(c=>c.diasMoraMax>=60).length;
+  const m30  = mora.filter(c=>c.diasMoraMax>=30&&c.diasMoraMax<60).length;
+  const m1   = mora.filter(c=>c.diasMoraMax>0&&c.diasMoraMax<30).length;
+  const sm60 = document.getElementById('h-mora-alta');
+  const sm30 = document.getElementById('h-mora-media');
+  const sm1  = document.getElementById('h-mora-baja');
+  if (sm60) sm60.textContent = m60;
+  if (sm30) sm30.textContent = m30;
+  if (sm1)  sm1.textContent  = m1;
+
+  // Top mora sin gestión reciente
+  const sinGest = mora
+    .filter(c => !estadosCliente[c.CodigoPago] ||
+                 estadosCliente[c.CodigoPago]?.estadoNombre === 'Sin contactar')
+    .sort((a,b)=>b.diasMoraMax-a.diasMoraMax)
+    .slice(0,8);
+
+  const topMoraEl = document.getElementById('home-top-mora');
+  if (topMoraEl) {
+    topMoraEl.innerHTML = sinGest.length ? sinGest.map(c => `
+      <div class="alerta-item alerta-mora" onclick="switchAdminTab_btn('cobranza');setTimeout(()=>{document.getElementById('cob-buscar').value='${c.NombreCliente}';renderCartera();},300)">
+        <div class="alerta-dot" style="background:#ef4444;"></div>
+        <div>
+          <div class="alerta-texto">${c.NombreCliente}</div>
+          <div class="alerta-meta">${c.Terreno} · ${c.diasMoraMax} días mora · Bs. ${c.deudaTotal.toLocaleString('es-BO',{maximumFractionDigits:0})}</div>
+        </div>
+      </div>`).join('')
+    : '<div style="font-size:13px;color:#10b981;padding:8px;">✅ Todos los clientes en mora tienen gestión asignada</div>';
+  }
+
+  // Alertas urgentes
+  const alertasEl = document.getElementById('home-alertas');
+  if (alertasEl) {
+    const alertas = [];
+    // Mora alta sin gestión
+    if (sinGest.length > 0) {
+      alertas.push({ tipo:'mora', texto:`${sinGest.length} clientes en mora sin gestionar`, sub:`Mayor deuda: ${sinGest[0]?.NombreCliente} — ${sinGest[0]?.diasMoraMax} días`, tab:'cobranza' });
+    }
+    // Mora +60 días
+    if (m60 > 0) {
+      alertas.push({ tipo:'mora', texto:`${m60} clientes con más de 60 días en mora`, sub:'Riesgo alto — revisar acción legal', tab:'cobranza' });
+    }
+    // Lotes sin precio
+    const sinPrecio = todosLotes.filter(l=>!l.precio && l.estado==='Disponible').length;
+    if (sinPrecio > 0) {
+      alertas.push({ tipo:'sin', texto:`${sinPrecio} lotes disponibles sin precio cargado`, sub:'Actualizar en el módulo Inventario', tab:'inventario' });
+    }
+    // Meta no cargada
+    const metaEl = document.getElementById('h-cob-meta');
+    if (metaEl && metaEl.textContent.includes('—')) {
+      alertas.push({ tipo:'gestion', texto:'Meta de cartera del mes no configurada', sub:'Ir a Config → Editar meta', tab:'cobranza' });
+    }
+    // Vendidos vs disponibles
+    const vendidosPct = todosLotes.length ? Math.round(todosLotes.filter(l=>l.estado==='Vendido').length/todosLotes.length*100) : 0;
+    if (vendidosPct >= 70) {
+      alertas.push({ tipo:'meta-pct', texto:`${vendidosPct}% del inventario ya vendido`, sub:'Excelente ritmo de ventas 🎉', tab:'inventario' });
+    }
+
+    if (!alertas.length) {
+      alertasEl.innerHTML = '<div style="font-size:13px;color:#10b981;padding:8px 0;">✅ Sin alertas pendientes. Todo en orden.</div>';
+    } else {
+      const iconos = { mora:'🔴', gestion:'🟡', 'meta-pct':'🟢', sin:'⚪' };
+      alertasEl.innerHTML = alertas.map(a => `
+        <div class="alerta-item alerta-${a.tipo}" onclick="switchAdminTab_btn('${a.tab}')" style="cursor:pointer;">
+          <div class="alerta-dot" style="background:${a.tipo==='mora'?'#ef4444':a.tipo==='gestion'?'#f59e0b':a.tipo==='meta-pct'?'#10b981':'#9ca3af'};"></div>
+          <div>
+            <div class="alerta-texto">${iconos[a.tipo]||''} ${a.texto}</div>
+            <div class="alerta-meta">${a.sub}</div>
+          </div>
+        </div>`).join('');
+    }
+  }
+
+  // Clientes mora sin gestión (tabla completa)
+  const sgEl = document.getElementById('home-sin-gestion');
+  if (sgEl) {
+    const sinG = mora.filter(c => !estadosCliente[c.CodigoPago]).sort((a,b)=>b.diasMoraMax-a.diasMoraMax);
+    if (!sinG.length) {
+      sgEl.innerHTML = '<div style="font-size:13px;color:#10b981;padding:8px 0;">✅ Todos los clientes en mora tienen gestión asignada</div>';
+    } else {
+      sgEl.innerHTML = `<table class="mora-table-mini">
+        <thead><tr><th>Cliente</th><th>Terreno</th><th>Asesor</th><th>Días mora</th><th>Deuda (Bs.)</th><th>Acción</th></tr></thead>
+        <tbody>${sinG.slice(0,15).map(c=>`<tr onclick="switchAdminTab_btn('cobranza');setTimeout(()=>{document.getElementById('cob-buscar').value='${c.NombreCliente}';renderCartera();},300)">
+          <td><strong>${c.NombreCliente}</strong></td>
+          <td>${c.Terreno||'—'}</td>
+          <td>${c.Asesor||'—'}</td>
+          <td style="color:#ef4444;font-weight:600;">${c.diasMoraMax}d</td>
+          <td style="font-weight:600;">Bs. ${c.deudaTotal.toLocaleString('es-BO',{maximumFractionDigits:0})}</td>
+          <td><span style="font-size:11px;color:#2563eb;cursor:pointer;">Ver →</span></td>
+        </tr>`).join('')}</tbody>
+      </table>` + (sinG.length>15 ? `<div style="font-size:12px;color:var(--gris);padding:8px;">... y ${sinG.length-15} más</div>` : '');
+    }
+  }
+
+  // Resumen ventas home
+  const vRes = document.getElementById('h-ventas-resumen');
+  if (vRes) {
+    const vMes = todosRegs.filter(r=>r.mes===mesActual());
+    const contratos = vMes.filter(r=>['Contrato','Reserva'].includes(r.estado)).length;
+    vRes.innerHTML = `
+      <div class="home-stat-row"><span class="home-stat-label">Registros este mes</span><span class="home-stat-val">${vMes.length}</span></div>
+      <div class="home-stat-row"><span class="home-stat-label">Contratos / Reservas</span><span class="home-stat-val" style="color:#10b981;">${contratos}</span></div>
+      <div class="home-stat-row"><span class="home-stat-label">Visitas concretadas</span><span class="home-stat-val">${vMes.filter(r=>r.visitaConcretada==='SI').length}</span></div>
+      <div class="home-stat-row"><span class="home-stat-label">Con cierre</span><span class="home-stat-val" style="color:#2d5a27;">${vMes.filter(r=>r.huboCierre==='SI').length}</span></div>
+    `;
+  }
+
+  // Metas en home
+  const hMetaPct = document.getElementById('h-meta-pct');
+  const hMetaSub = document.getElementById('h-meta-sub');
+  // Se actualiza via updateHomeMetas()
+}
+
+function updateHomeMetas(tipo, cobrado, meta, pct) {
+  if (tipo === 'cartera') {
+    const el = document.getElementById('h-meta-pct');
+    const sub = document.getElementById('h-meta-sub');
+    const bar = document.getElementById('h-cob-bar');
+    const cobEl = document.getElementById('h-cob-cobrado');
+    const metaEl = document.getElementById('h-cob-meta');
+    const pctTxt = document.getElementById('h-cob-pct-txt');
+    if (el) { el.textContent = pct+'%'; el.style.color = pct>=100?'#10b981':pct>=75?'#f59e0b':'#ef4444'; }
+    if (sub) sub.textContent = pct+'% alcanzado este mes';
+    if (bar) { bar.style.width=Math.min(pct,100)+'%'; bar.style.background=pct>=100?'linear-gradient(90deg,#10b981,#34d399)':pct>=75?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#2d5a27,#4a8c3f)'; }
+    if (cobEl) cobEl.textContent = 'Bs. ' + cobrado.toLocaleString('es-BO',{maximumFractionDigits:0});
+    if (metaEl) metaEl.textContent = 'meta: ' + (meta ? 'Bs. '+Number(meta).toLocaleString('es-BO',{maximumFractionDigits:0}) : '—');
+    if (pctTxt) pctTxt.textContent = pct+'%';
+  } else {
+    const bar = document.getElementById('h-exp-bar');
+    const cobEl = document.getElementById('h-exp-cobrado');
+    const metaEl = document.getElementById('h-exp-meta');
+    const pctTxt = document.getElementById('h-exp-pct-txt');
+    if (bar) { bar.style.width=Math.min(pct,100)+'%'; }
+    if (cobEl) cobEl.textContent = 'Bs. ' + cobrado.toLocaleString('es-BO',{maximumFractionDigits:0});
+    if (metaEl) metaEl.textContent = 'meta: ' + (meta ? 'Bs. '+Number(meta).toLocaleString('es-BO',{maximumFractionDigits:0}) : '—');
+    if (pctTxt) pctTxt.textContent = pct+'%';
+  }
+}
+
+/* ═══════════════════════════════════════════
+   INIT MÓDULOS CUANDO ENTRA ADMIN
+═══════════════════════════════════════════ */
+const _origEntrarAdmin = entrarAdmin;
+function entrarAdmin() {
+  _origEntrarAdmin();
+  // Escuchar estados dinámicos
+  window._fbListenEstados(arr => {
+    estadosGestion = arr;
+    renderEstadosConfig();
+    if (clienteActivo) renderEstadosBtns(clienteActivo.CodigoPago);
+  });
+  // Escuchar estados de clientes
+  window._fbGetEstadosClientes(data => {
+    estadosCliente = data;
+    renderCartera();
+    renderHome();
+  });
+  // Cargar APIs Orange
+  cargarCartera();
+  cargarExpensas();
+  // Auto-refresh cada 5 minutos
+  setInterval(() => {
+    if (modoAdmin) {
+      cargarCartera();
+      cargarExpensas();
+      renderHome();
+    }
+  }, 5 * 60 * 1000);
+}
+</script>
+
+</body>
+</html>
