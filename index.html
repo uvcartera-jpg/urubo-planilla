@@ -280,7 +280,7 @@
 <div id="toast-container"></div>
 
 <!-- ═══ BANNER OFFLINE ═══ -->
-<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;text-align:center;padding:8px;font-size:var(--fs-base);font-weight:500;z-index:10000;font-family:'DM Sans',sans-serif;">
+<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;background:var(--danger);color:#fff;text-align:center;padding:8px;font-size:var(--fs-base);font-weight:500;z-index:10000;font-family:'DM Sans',sans-serif;">
   ⚠️ Sin conexión a internet — los cambios no se guardarán hasta reconectar
 </div>
 
@@ -709,17 +709,17 @@
       <div class="admin-section">
         <h3>🏘 Expensas — <span id="uexp-nombre-usuario">—</span></h3>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-3);margin-bottom:16px;">
-          <div class="kpi-card" style="border-left:4px solid #2563eb;">
+          <div class="kpi-card" style="border-left:4px solid var(--info);">
             <div class="kpi-label">🏘 Cobrado este mes</div>
             <div class="kpi-num" id="uexp-mes-total" style="color:var(--info);font-size:var(--fs-3xl);">$0</div>
             <div class="kpi-sub" id="uexp-mes-n">0 cobros</div>
           </div>
-          <div class="kpi-card" style="border-left:4px solid #7c3aed;">
+          <div class="kpi-card" style="border-left:4px solid var(--accent);">
             <div class="kpi-label">🎯 Meta del mes</div>
             <div class="kpi-num" id="uexp-meta-val" style="color:var(--accent);font-size:var(--fs-3xl);">—</div>
             <div class="kpi-sub" id="uexp-meta-pct">sin meta asignada</div>
           </div>
-          <div class="kpi-card" style="border-left:4px solid #d97706;">
+          <div class="kpi-card" style="border-left:4px solid var(--warn);">
             <div class="kpi-label">📈 Total histórico</div>
             <div class="kpi-num" id="uexp-historico" style="color:var(--warn);font-size:var(--fs-3xl);">$0</div>
           </div>
@@ -730,10 +730,10 @@
             <div class="meta-prog-pct" style="color:var(--accent);" id="uexp-meta-pct-txt">0%</div>
           </div>
           <div class="meta-prog-track">
-            <div class="meta-prog-fill" id="uexp-meta-bar" style="width:0%;background:linear-gradient(90deg,#7c3aed,#a78bfa);"></div>
+            <div class="meta-prog-fill" id="uexp-meta-bar" style="width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-light));"></div>
           </div>
         </div>
-        <button onclick="document.getElementById('uexp-nuevo-form').style.display='block'" style="padding:10px 20px;background:#7c3aed;color:#fff;border:none;border-radius:var(--r-md);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:16px;">➕ Registrar cobro expensa</button>
+        <button onclick="document.getElementById('uexp-nuevo-form').style.display='block'" style="padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-md);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:16px;">➕ Registrar cobro expensa</button>
         <div id="uexp-nuevo-form" style="display:none;background:var(--bg-soft);border-radius:var(--r-lg);padding:20px;margin-bottom:16px;">
           <h4 style="font-family:'Cormorant Garamond',serif;font-size:var(--fs-lg);margin-bottom:14px;">Nueva expensa cobrada</h4>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-bottom:12px;">
@@ -745,7 +745,7 @@
             <div style="grid-column:1/-1;"><label>Observaciones</label><input type="text" id="uexp-obs" placeholder="Nota opcional..."/></div>
           </div>
           <div style="display:flex;gap:var(--sp-2);">
-            <button onclick="guardarExpensaUsuario()" style="padding:10px 20px;background:#7c3aed;color:#fff;border:none;border-radius:var(--r-md);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">✓ Guardar</button>
+            <button onclick="guardarExpensaUsuario()" style="padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-md);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">✓ Guardar</button>
             <button onclick="document.getElementById('uexp-nuevo-form').style.display='none'" style="padding:10px 16px;background:var(--fill);border:1.5px solid var(--line);border-radius:var(--r-md);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">Cancelar</button>
           </div>
         </div>
@@ -756,22 +756,22 @@
     <!-- ══ MÓDULO MARKETING ══ -->
     <div id="utab-marketing" style="display:none;">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);margin-bottom:16px;">
-        <div class="kpi-card" style="border-left:4px solid #2563eb;">
+        <div class="kpi-card" style="border-left:4px solid var(--info);">
           <div class="kpi-label">Leads cargados</div>
           <div class="kpi-num" id="mkt-leads-n" style="color:var(--info);">0</div>
           <div class="kpi-sub" id="mkt-leads-sub">este mes</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #d97706;">
+        <div class="kpi-card" style="border-left:4px solid var(--warn);">
           <div class="kpi-label">Visitas generadas</div>
           <div class="kpi-num" id="mkt-visitas-n" style="color:var(--warn);">0</div>
           <div class="kpi-sub">desde leads</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #10b981;">
+        <div class="kpi-card" style="border-left:4px solid var(--ok);">
           <div class="kpi-label">Cierres</div>
           <div class="kpi-num" id="mkt-cierres-n" style="color:var(--ok);">0</div>
           <div class="kpi-sub">este mes</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #7c3aed;">
+        <div class="kpi-card" style="border-left:4px solid var(--accent);">
           <div class="kpi-label">Conversión</div>
           <div class="kpi-num" id="mkt-conv-pct" style="color:var(--accent);">0%</div>
           <div class="kpi-sub">lead→cierre</div>
@@ -784,7 +784,7 @@
             <div style="font-size:var(--fs-sm);font-weight:600;color:var(--ink-700);margin-bottom:6px;">Leads</div>
             <div class="meta-barra-wrap">
               <div class="meta-barra-row"><span id="mkt-leads-cobrado">0</span><span id="mkt-leads-meta-txt">meta: —</span></div>
-              <div class="meta-barra-track"><div class="meta-barra-fill" id="mkt-leads-bar" style="width:0%;background:linear-gradient(90deg,#2563eb,#60a5fa);"></div></div>
+              <div class="meta-barra-track"><div class="meta-barra-fill" id="mkt-leads-bar" style="width:0%;background:linear-gradient(90deg,var(--info),var(--info-light));"></div></div>
               <div style="font-size:var(--fs-xs);color:var(--gris);margin-top:3px;" id="mkt-leads-pct-txt">0%</div>
             </div>
           </div>
@@ -792,7 +792,7 @@
             <div style="font-size:var(--fs-sm);font-weight:600;color:var(--ink-700);margin-bottom:6px;">Visitas</div>
             <div class="meta-barra-wrap">
               <div class="meta-barra-row"><span id="mkt-visitas-cobrado">0</span><span id="mkt-visitas-meta-txt">meta: —</span></div>
-              <div class="meta-barra-track"><div class="meta-barra-fill" id="mkt-visitas-bar" style="width:0%;background:linear-gradient(90deg,#d97706,#fbbf24);"></div></div>
+              <div class="meta-barra-track"><div class="meta-barra-fill" id="mkt-visitas-bar" style="width:0%;background:linear-gradient(90deg,var(--warn),var(--warn-light));"></div></div>
               <div style="font-size:var(--fs-xs);color:var(--gris);margin-top:3px;" id="mkt-visitas-pct-txt">0%</div>
             </div>
           </div>
@@ -800,7 +800,7 @@
             <div style="font-size:var(--fs-sm);font-weight:600;color:var(--ink-700);margin-bottom:6px;">Cierres</div>
             <div class="meta-barra-wrap">
               <div class="meta-barra-row"><span id="mkt-cierres-cobrado">0</span><span id="mkt-cierres-meta-txt">meta: —</span></div>
-              <div class="meta-barra-track"><div class="meta-barra-fill" id="mkt-cierres-bar" style="width:0%;background:linear-gradient(90deg,#10b981,#34d399);"></div></div>
+              <div class="meta-barra-track"><div class="meta-barra-fill" id="mkt-cierres-bar" style="width:0%;background:linear-gradient(90deg,var(--ok),var(--ok-light));"></div></div>
               <div style="font-size:var(--fs-xs);color:var(--gris);margin-top:3px;" id="mkt-cierres-pct-txt">0%</div>
             </div>
           </div>
@@ -815,7 +815,7 @@
           <h3 style="margin:0;">📥 Gestión de Leads</h3>
           <div style="display:flex;gap:var(--sp-2);">
             <button onclick="switchMktTab('cargar')" style="padding:8px 14px;background:var(--verde);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">➕ Cargar</button>
-            <button onclick="switchMktTab('excel')" style="padding:8px 14px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">📤 Excel</button>
+            <button onclick="switchMktTab('excel')" style="padding:8px 14px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">📤 Excel</button>
           </div>
         </div>
         <div id="mkt-form-cargar" style="display:none;background:var(--bg-soft);border-radius:var(--r-lg);padding:18px;margin-bottom:16px;">
@@ -856,7 +856,7 @@
           <div id="mkt-lead-success" style="display:none;margin-top:10px;background:var(--ok-bg);border-radius:var(--r-sm);padding:10px;text-align:center;color:var(--ok-ink);font-size:var(--fs-base);">✅ Lead guardado</div>
         </div>
         <div id="mkt-form-excel" style="display:none;background:var(--bg-soft);border-radius:var(--r-lg);padding:18px;margin-bottom:16px;">
-          <button onclick="descargarPlantillaLeads()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:14px;">⬇ Plantilla Excel</button>
+          <button onclick="descargarPlantillaLeads()" style="padding:8px 16px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:14px;">⬇ Plantilla Excel</button>
           <div class="upload-zone" onclick="document.getElementById('mkt-excel-file').click()">
             <div style="font-size:var(--fs-3xl);">📂</div>
             <div style="font-size:var(--fs-md);font-weight:600;">Arrastrá tu Excel de leads o hacé clic</div>
@@ -891,7 +891,7 @@
             <option value="">Todos los estados</option>
             <option>Nuevo</option><option>Contactado</option><option>Agendado</option><option>Descartado</option>
           </select>
-          <button onclick="exportarLeads()" style="padding:8px 14px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Excel</button>
+          <button onclick="exportarLeads()" style="padding:8px 14px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Excel</button>
         </div>
         <div id="mkt-leads-lista"><div class="empty-state">Sin leads cargados.</div></div>
       </div>
@@ -912,7 +912,7 @@
             <div class="fichero-stat-lbl">Registros</div>
           </div>
           <div class="fichero-stat-block">
-            <div class="fichero-stat-num" style="color:#fbbf24;" id="fich-visitas-hero">0</div>
+            <div class="fichero-stat-num" style="color:var(--warn-light);" id="fich-visitas-hero">0</div>
             <div class="fichero-stat-lbl">Visitas</div>
           </div>
           <div class="fichero-stat-block">
@@ -931,7 +931,7 @@
             <div class="meta-prog-pct" style="color:var(--info);" id="fichero-visitas-pct">0%</div>
           </div>
           <div class="meta-prog-track">
-            <div class="meta-prog-fill" id="fichero-visitas-bar" style="width:0%;background:linear-gradient(90deg,#2563eb,#60a5fa);"></div>
+            <div class="meta-prog-fill" id="fichero-visitas-bar" style="width:0%;background:linear-gradient(90deg,var(--info),var(--info-light));"></div>
           </div>
           <div class="meta-prog-detail">
             <span>Realizadas: <strong id="fichero-visitas-real">0</strong></span>
@@ -944,7 +944,7 @@
             <div class="meta-prog-pct" style="color:var(--ok);" id="fichero-cierres-pct">0%</div>
           </div>
           <div class="meta-prog-track">
-            <div class="meta-prog-fill" id="fichero-cierres-bar" style="width:0%;background:linear-gradient(90deg,#10b981,#34d399);"></div>
+            <div class="meta-prog-fill" id="fichero-cierres-bar" style="width:0%;background:linear-gradient(90deg,var(--ok),var(--ok-light));"></div>
           </div>
           <div class="meta-prog-detail">
             <span>Cierres: <strong id="fichero-cierres-real">0</strong></span>
@@ -1278,8 +1278,8 @@
               <div class="l" style="color:var(--danger);">+60 días</div>
             </div>
             <div class="mora-nivel" style="background:var(--warn-bg);">
-              <div class="n" style="color:#f59e0b;" id="h-mora-media">—</div>
-              <div class="l" style="color:#f59e0b;">30–60 días</div>
+              <div class="n" style="color:var(--warn);" id="h-mora-media">—</div>
+              <div class="l" style="color:var(--warn);">30–60 días</div>
             </div>
             <div class="mora-nivel" style="background:#fefce8;">
               <div class="n" style="color:#ca8a04;" id="h-mora-baja">—</div>
@@ -1305,7 +1305,7 @@
                 <span id="h-cob-meta">meta: —</span>
               </div>
               <div class="meta-mini-track">
-                <div class="meta-mini-fill" id="h-cob-bar" style="width:0%;background:linear-gradient(90deg,#2d5a27,#4a8c3f);"></div>
+                <div class="meta-mini-fill" id="h-cob-bar" style="width:0%;background:linear-gradient(90deg,var(--cartera),var(--cartera-light));"></div>
               </div>
               <div style="font-size:var(--fs-xs);color:var(--gris);margin-top:3px;" id="h-cob-pct-txt">—%</div>
             </div>
@@ -1346,22 +1346,22 @@
     <div class="tab-panel" id="panel-marketing-admin">
       <!-- KPIs -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);margin-bottom:16px;">
-        <div class="kpi-card" style="border-left:4px solid #2563eb;">
+        <div class="kpi-card" style="border-left:4px solid var(--info);">
           <div class="kpi-label">Leads totales</div>
           <div class="kpi-num" id="adm-leads-total" style="color:var(--info);">—</div>
           <div class="kpi-sub" id="adm-leads-mes">este mes</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #d97706;">
+        <div class="kpi-card" style="border-left:4px solid var(--warn);">
           <div class="kpi-label">Visitas generadas</div>
           <div class="kpi-num" id="adm-visitas-total" style="color:var(--warn);">—</div>
           <div class="kpi-sub">desde leads</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #10b981;">
+        <div class="kpi-card" style="border-left:4px solid var(--ok);">
           <div class="kpi-label">Cierres del mes</div>
           <div class="kpi-num" id="adm-cierres-total" style="color:var(--ok);">—</div>
           <div class="kpi-sub" id="adm-conv-pct">conversión —%</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #7c3aed;">
+        <div class="kpi-card" style="border-left:4px solid var(--accent);">
           <div class="kpi-label">Costo por lead</div>
           <div class="kpi-num" id="adm-cpl" style="color:var(--accent);font-size:var(--fs-2xl);">—</div>
           <div class="kpi-sub">si se configura presupuesto</div>
@@ -1372,14 +1372,14 @@
       <div class="admin-section" style="margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:16px;">
           <h3 style="margin:0;">🎯 Metas de Marketing — <span id="adm-mkt-mes-label">—</span></h3>
-          <button onclick="abrirModalMetaMarketing()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⚙ Editar metas</button>
+          <button onclick="abrirModalMetaMarketing()" style="padding:8px 16px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⚙ Editar metas</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-4);">
           <div>
             <div style="font-size:var(--fs-sm);font-weight:600;color:var(--ink-700);margin-bottom:6px;">Leads</div>
             <div class="meta-barra-wrap">
               <div class="meta-barra-row"><span id="adm-leads-actual">0</span><span id="adm-leads-meta-txt">meta: —</span></div>
-              <div class="meta-barra-track"><div class="meta-barra-fill" id="adm-leads-bar" style="width:0%;background:linear-gradient(90deg,#2563eb,#60a5fa);"></div></div>
+              <div class="meta-barra-track"><div class="meta-barra-fill" id="adm-leads-bar" style="width:0%;background:linear-gradient(90deg,var(--info),var(--info-light));"></div></div>
               <div style="font-size:var(--fs-xs);color:var(--gris);margin-top:3px;" id="adm-leads-pct">0%</div>
             </div>
           </div>
@@ -1387,7 +1387,7 @@
             <div style="font-size:var(--fs-sm);font-weight:600;color:var(--ink-700);margin-bottom:6px;">Visitas</div>
             <div class="meta-barra-wrap">
               <div class="meta-barra-row"><span id="adm-visitas-actual">0</span><span id="adm-visitas-meta-txt">meta: —</span></div>
-              <div class="meta-barra-track"><div class="meta-barra-fill" id="adm-visitas-bar" style="width:0%;background:linear-gradient(90deg,#d97706,#fbbf24);"></div></div>
+              <div class="meta-barra-track"><div class="meta-barra-fill" id="adm-visitas-bar" style="width:0%;background:linear-gradient(90deg,var(--warn),var(--warn-light));"></div></div>
               <div style="font-size:var(--fs-xs);color:var(--gris);margin-top:3px;" id="adm-visitas-pct">0%</div>
             </div>
           </div>
@@ -1395,7 +1395,7 @@
             <div style="font-size:var(--fs-sm);font-weight:600;color:var(--ink-700);margin-bottom:6px;">Cierres</div>
             <div class="meta-barra-wrap">
               <div class="meta-barra-row"><span id="adm-cierres-actual">0</span><span id="adm-cierres-meta-txt">meta: —</span></div>
-              <div class="meta-barra-track"><div class="meta-barra-fill" id="adm-cierres-bar" style="width:0%;background:linear-gradient(90deg,#10b981,#34d399);"></div></div>
+              <div class="meta-barra-track"><div class="meta-barra-fill" id="adm-cierres-bar" style="width:0%;background:linear-gradient(90deg,var(--ok),var(--ok-light));"></div></div>
               <div style="font-size:var(--fs-xs);color:var(--gris);margin-top:3px;" id="adm-cierres-pct">0%</div>
             </div>
           </div>
@@ -1426,7 +1426,7 @@
       <div class="admin-section">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:14px;">
           <h3 style="margin:0;">📋 Todos los leads</h3>
-          <button onclick="exportarLeads()" style="padding:8px 14px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Excel</button>
+          <button onclick="exportarLeads()" style="padding:8px 14px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Excel</button>
         </div>
         <div style="display:flex;gap:var(--sp-2);margin-bottom:12px;flex-wrap:wrap;">
           <select id="adm-fil-semana" onchange="renderAdminMarketing()" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:var(--r-sm);font-size:var(--fs-base);font-family:'DM Sans',sans-serif;">
@@ -1859,22 +1859,22 @@
 
       <!-- KPIs TOP -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-4);margin-bottom:20px;">
-        <div class="kpi-card" style="border-left:4px solid #2d5a27;">
+        <div class="kpi-card" style="border-left:4px solid var(--cartera);">
           <div class="kpi-label">Cobrado (suma meta)</div>
-          <div class="kpi-num" id="cart-kpi-cobrado" style="color:#2d5a27;font-size:var(--fs-3xl);">$0</div>
+          <div class="kpi-num" id="cart-kpi-cobrado" style="color:var(--cartera);font-size:var(--fs-3xl);">$0</div>
           <div class="kpi-sub" id="cart-kpi-cobrado-pct">0% de la meta</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #d97706;">
+        <div class="kpi-card" style="border-left:4px solid var(--warn);">
           <div class="kpi-label">Cobrado (no meta)</div>
           <div class="kpi-num" id="cart-kpi-nometa" style="color:var(--warn);font-size:var(--fs-3xl);">$0</div>
           <div class="kpi-sub" id="cart-kpi-nometa-n">cobros adicionales</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #2563eb;">
+        <div class="kpi-card" style="border-left:4px solid var(--info);">
           <div class="kpi-label">Total general</div>
           <div class="kpi-num" id="cart-kpi-total" style="color:var(--info);font-size:var(--fs-3xl);">$0</div>
           <div class="kpi-sub" id="cart-kpi-total-n">todos los cobros</div>
         </div>
-        <div class="kpi-card" style="border-left:4px solid #7c3aed;">
+        <div class="kpi-card" style="border-left:4px solid var(--accent);">
           <div class="kpi-label">Clientes en meta</div>
           <div class="kpi-num" id="cart-kpi-meta" style="color:var(--accent);font-size:var(--fs-3xl);">0</div>
           <div class="kpi-sub" id="cart-kpi-meta-n">monto esperado: —</div>
@@ -1888,7 +1888,7 @@
           <div style="font-size:var(--fs-2xl);font-weight:700;color:var(--verde);font-family:'Cormorant Garamond',serif;" id="cart-pct-display">0%</div>
         </div>
         <div style="height:12px;background:var(--ok-bg);border-radius:999px;overflow:hidden;">
-          <div id="cart-barra-main" style="height:100%;width:0%;background:linear-gradient(90deg,#2d5a27,#4a8c3f);border-radius:999px;transition:width .6s;"></div>
+          <div id="cart-barra-main" style="height:100%;width:0%;background:linear-gradient(90deg,var(--cartera),var(--cartera-light));border-radius:999px;transition:width .6s;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:var(--fs-sm);color:var(--gris);margin-top:6px;">
           <span>Cobrado meta: <strong id="cart-cobrado-display">$0</strong></span>
@@ -2022,7 +2022,7 @@
           <div id="form-excel-meta" style="display:none;background:var(--bg-soft);border:1.5px solid var(--line);border-radius:var(--r-lg);padding:16px;margin-bottom:16px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
               <span style="font-size:var(--fs-base);font-weight:600;">Subir Excel de meta mensual</span>
-              <button onclick="descargarPlantillaMeta()" style="padding:7px 14px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-sm);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Plantilla</button>
+              <button onclick="descargarPlantillaMeta()" style="padding:7px 14px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-sm);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Plantilla</button>
             </div>
             <div class="upload-zone" style="padding:24px;" onclick="document.getElementById('meta-excel-file').click()">
               <div style="font-size:var(--fs-3xl);margin-bottom:6px;">📂</div>
@@ -2080,7 +2080,7 @@
         </div>
 
         <!-- TOTAL GENERAL -->
-        <div style="background:linear-gradient(135deg,#1a3515,#2d5a27);border-radius:var(--r-lg);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="background:linear-gradient(135deg,#1a3515,var(--cartera));border-radius:var(--r-lg);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
           <div>
             <div style="color:rgba(255,255,255,.6);font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Total general cobrado</div>
             <div style="color:rgba(255,255,255,.7);font-size:var(--fs-sm);margin-top:4px;" id="cart-resumen-mes">este mes</div>
@@ -2094,7 +2094,7 @@
         <div class="admin-section">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:14px;">
             <h3 style="margin:0;">📁 Todos los cobros</h3>
-            <button onclick="exportarCartaCompleto()" style="padding:8px 14px;background:#2d5a27;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Exportar Excel</button>
+            <button onclick="exportarCartaCompleto()" style="padding:8px 14px;background:var(--cartera);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Exportar Excel</button>
           </div>
           <div class="tabla-wrap">
             <table>
@@ -2117,26 +2117,26 @@
             <h3 style="margin:0;">🏘 Expensas — <span id="exp-periodo-label">—</span></h3>
             <p style="font-size:var(--fs-base);color:var(--gris);margin-top:4px;">Meta mensual por monto total</p>
           </div>
-          <button onclick="abrirModalMetaExpensas()" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-md);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⚙ Editar meta</button>
+          <button onclick="abrirModalMetaExpensas()" style="padding:8px 16px;background:var(--info);color:#fff;border:none;border-radius:var(--r-md);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⚙ Editar meta</button>
         </div>
         <!-- KPIs expensas -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);margin-bottom:16px;">
-          <div class="kpi-card" style="border-left:4px solid #2563eb;">
+          <div class="kpi-card" style="border-left:4px solid var(--info);">
             <div class="kpi-label">Meta del mes ($)</div>
             <div class="kpi-num" id="exp-meta-val" style="color:var(--info);font-size:var(--fs-2xl);">—</div>
             <div class="kpi-sub">monto objetivo</div>
           </div>
-          <div class="kpi-card" style="border-left:4px solid #10b981;">
+          <div class="kpi-card" style="border-left:4px solid var(--ok);">
             <div class="kpi-label">Cobrado este mes</div>
             <div class="kpi-num" id="exp-cobrado-val" style="color:var(--ok);font-size:var(--fs-2xl);">$0</div>
             <div class="kpi-sub" id="exp-cobrado-n">0 cobros</div>
           </div>
-          <div class="kpi-card" style="border-left:4px solid #d97706;">
+          <div class="kpi-card" style="border-left:4px solid var(--warn);">
             <div class="kpi-label">% Alcanzado</div>
             <div class="kpi-num" id="exp-pct-val" style="color:var(--warn);font-size:var(--fs-2xl);">0%</div>
             <div class="kpi-sub" id="exp-falta-val">—</div>
           </div>
-          <div class="kpi-card" style="border-left:4px solid #7c3aed;">
+          <div class="kpi-card" style="border-left:4px solid var(--accent);">
             <div class="kpi-label">Total histórico</div>
             <div class="kpi-num" id="exp-historico-val" style="color:var(--accent);font-size:var(--fs-2xl);">$0</div>
             <div class="kpi-sub">todos los meses</div>
@@ -2149,7 +2149,7 @@
             <span id="exp-barra-pct" style="color:var(--accent);">0%</span>
           </div>
           <div class="meta-barra-track" style="height:14px;">
-            <div class="meta-barra-fill" id="exp-barra" style="width:0%;background:linear-gradient(90deg,#2563eb,#7c3aed);"></div>
+            <div class="meta-barra-fill" id="exp-barra" style="width:0%;background:linear-gradient(90deg,var(--info),var(--accent));"></div>
           </div>
         </div>
       </div>
@@ -2159,7 +2159,7 @@
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:14px;">
           <h3 style="margin:0;">➕ Cargar cobro expensa</h3>
           <div style="display:flex;gap:var(--sp-2);">
-            <button onclick="abrirExcelExpensas()" style="padding:8px 14px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬆ Importar Excel</button>
+            <button onclick="abrirExcelExpensas()" style="padding:8px 14px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬆ Importar Excel</button>
             <button onclick="toggleFormExpensa()" style="padding:8px 14px;background:var(--verde);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">+ Nuevo cobro</button>
           </div>
         </div>
@@ -2208,7 +2208,7 @@
             <div><label>Observaciones</label><input type="text" id="exp-nuevo-obs" placeholder="Nota opcional..."/></div>
           </div>
           <div style="display:flex;gap:var(--sp-2);">
-            <button onclick="guardarCobradoExpensa()" style="padding:9px 18px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">✓ Guardar</button>
+            <button onclick="guardarCobradoExpensa()" style="padding:9px 18px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">✓ Guardar</button>
             <button onclick="toggleFormExpensa()" class="btn-secondary btn-sm">Cancelar</button>
           </div>
         </div>
@@ -2225,7 +2225,7 @@
             <option value="">Todas las semanas</option>
             <option value="S1">S1</option><option value="S2">S2</option><option value="S3">S3</option><option value="S4">S4</option>
           </select>
-          <button onclick="exportarExpensasAdmin()" style="padding:8px 14px;background:#2563eb;color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Excel</button>
+          <button onclick="exportarExpensasAdmin()" style="padding:8px 14px;background:var(--info);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-base);cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Excel</button>
         </div>
         <div id="exp-cobros-lista"><div class="empty-state">Sin cobros de expensas.</div></div>
       </div>

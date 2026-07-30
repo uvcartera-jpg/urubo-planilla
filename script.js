@@ -158,7 +158,7 @@ function confirmDialog(message, opts={}) {
     btnOk.className = 'confirm-btn-ok' + (opts.positive ? ' ok-positive' : '');
     document.getElementById('confirm-icon').textContent = opts.icon || (opts.positive ? '✓' : '🗑');
     document.getElementById('confirm-icon').style.background = opts.positive ? '#f0f7ee' : '#fef2f2';
-    document.getElementById('confirm-icon').style.color = opts.positive ? 'var(--verde)' : '#ef4444';
+    document.getElementById('confirm-icon').style.color = opts.positive ? 'var(--verde)' : 'var(--danger)';
     document.getElementById('confirm-overlay').classList.add('open');
   });
 }
@@ -252,7 +252,7 @@ function renderAsesorGrid() {
     return;
   }
   grid.innerHTML = asesores.map(a => {
-    const rolInfo = (typeof ROL_LABELS !== 'undefined' && ROL_LABELS[a.rol]) || { label:'Asesor comercial', color:'#2d5a27', icon:'' };
+    const rolInfo = (typeof ROL_LABELS !== 'undefined' && ROL_LABELS[a.rol]) || { label:'Asesor comercial', color:'var(--cartera)', icon:'' };
     return `
     <button class="asesor-btn" onclick="seleccionarAsesor('${a._key}', this)">
       <div class="av" style="background:${rolInfo.color};">${iniciales(a.nombre)}</div>
@@ -973,9 +973,9 @@ function renderDashboard() {
   const funnelEl = document.getElementById('chart-funnel');
   if (funnelEl) {
     const funnelData = [
-      { label:'Agendadas', n:agendadas, color:'#2563eb' },
-      { label:'Visitas concretadas', n:concretadas, color:'#d97706', pct:conv1 },
-      { label:'Con cierre', n:conCierre, color:'#2d5a27', pct:conv2 },
+      { label:'Agendadas', n:agendadas, color:'var(--info)' },
+      { label:'Visitas concretadas', n:concretadas, color:'var(--warn)', pct:conv1 },
+      { label:'Con cierre', n:conCierre, color:'var(--cartera)', pct:conv2 },
     ];
     const maxF = Math.max(...funnelData.map(f=>f.n), 1);
     funnelEl.innerHTML = funnelData.map(f => `
@@ -996,7 +996,7 @@ function renderDashboard() {
   const visitasEl = document.getElementById('chart-visitas');
   if (visitasEl) {
     const maxV = Math.max(...Object.values(visitasTipo),1);
-    const colV = {'1era Visita':'#2563eb','2da Visita':'#d97706','3era Visita':'#7c3aed','Re-Agenda':'#dc2626','Reunión Virtual':'#059669'};
+    const colV = {'1era Visita':'var(--info)','2da Visita':'var(--warn)','3era Visita':'var(--accent)','Re-Agenda':'var(--danger)','Reunión Virtual':'var(--ok)'};
     visitasEl.innerHTML = Object.entries(visitasTipo).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`
       <div class="bar-item">
         <div class="bar-label"><span>${k}</span><span>${n}</span></div>
@@ -1010,7 +1010,7 @@ function renderDashboard() {
   const asesorCounts = {};
   vMes.forEach(r => asesorCounts[r.asesorNombre]=(asesorCounts[r.asesorNombre]||0)+1);
   const maxA = Math.max(...Object.values(asesorCounts),1);
-  const colores = ['#2d5a27','#4a8c3f','#2563eb','#d97706','#7c3aed','#dc2626'];
+  const colores = ['var(--cartera)','var(--cartera-light)','var(--info)','var(--warn)','var(--accent)','var(--danger)'];
   document.getElementById('chart-asesores').innerHTML =
     Object.entries(asesorCounts).sort((a,b)=>b[1]-a[1]).map(([k,n],i)=>`
       <div class="bar-item">
@@ -1334,7 +1334,7 @@ function renderInventario() {
       <td style="font-weight:600;font-family:monospace;font-size:var(--fs-base);">${terreno}</td>
       <td style="text-align:center;">${l.metraje ? l.metraje.toLocaleString('es-BO') + ' m²' : '—'}</td>
       <td style="text-align:center;color:var(--ink-500);">${precioM2 ? '$'+precioM2.toLocaleString('es-BO',{maximumFractionDigits:2}) : '—'}</td>
-      <td style="font-weight:600;color:#2d5a27;">${l.precio ? '$'+Number(l.precio).toLocaleString('es-BO') : '—'}</td>
+      <td style="font-weight:600;color:var(--cartera);">${l.precio ? '$'+Number(l.precio).toLocaleString('es-BO') : '—'}</td>
       <td><span style="padding:3px 10px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;${estStyle}">${l.estado||'—'}</span></td>
       <td style="font-size:var(--fs-sm);color:var(--ink-500);">${l.obs||''}</td>
       <td>
@@ -1487,7 +1487,7 @@ function procesarExcelInventario(input) {
       <td>${esc(r.terreno)}${r.valido?'':' <span style="font-size:var(--fs-xs);color:var(--danger);font-weight:600;">formato inválido</span>'}</td>
       <td>${r.metraje ? r.metraje+' m²' : '—'}</td>
       <td>${r.precioM2 ? '$'+r.precioM2.toLocaleString('es-BO',{maximumFractionDigits:2}) : '—'}</td>
-      <td style="font-weight:600;color:#2d5a27;">${r.precio ? '$'+r.precio.toLocaleString('es-BO') : '—'}</td>
+      <td style="font-weight:600;color:var(--cartera);">${r.precio ? '$'+r.precio.toLocaleString('es-BO') : '—'}</td>
       <td>${esc(r.estado)}</td>
       <td>${esc(r.obs)}</td>
     </tr>`).join('');
@@ -1664,7 +1664,7 @@ function renderHome() {
   if (topMoraEl) {
     topMoraEl.innerHTML = sinGest.length ? sinGest.map(c => `
       <div class="alerta-item alerta-mora" onclick="switchAdminTab_btn('cartera')">
-        <div class="alerta-dot" style="background:#ef4444;"></div>
+        <div class="alerta-dot" style="background:var(--danger);"></div>
         <div>
           <div class="alerta-texto">${esc(c.cliente)}</div>
           <div class="alerta-meta">${c.concepto||''} · ${c.estado||'Mora'} · $${(c.monto||0).toLocaleString('es-BO',{maximumFractionDigits:0})}</div>
@@ -1703,7 +1703,7 @@ function renderHome() {
       const iconos = { mora:'🔴', gestion:'🟡', 'meta-pct':'🟢', sin:'⚪' };
       alertasEl.innerHTML = alertas.map(a => `
         <div class="alerta-item alerta-${a.tipo}" onclick="switchAdminTab_btn('${a.tab}')" style="cursor:pointer;">
-          <div class="alerta-dot" style="background:${a.tipo==='mora'?'#ef4444':a.tipo==='gestion'?'#f59e0b':a.tipo==='meta-pct'?'#10b981':'#9ca3af'};"></div>
+          <div class="alerta-dot" style="background:${a.tipo==='mora'?'var(--danger)':a.tipo==='gestion'?'var(--warn)':a.tipo==='meta-pct'?'var(--ok)':'#9ca3af'};"></div>
           <div>
             <div class="alerta-texto">${iconos[a.tipo]||''} ${a.texto}</div>
             <div class="alerta-meta">${a.sub}</div>
@@ -1742,7 +1742,7 @@ function renderHome() {
       <div class="home-stat-row"><span class="home-stat-label">Registros este mes</span><span class="home-stat-val">${vMes.length}</span></div>
       <div class="home-stat-row"><span class="home-stat-label">Contratos / Reservas</span><span class="home-stat-val" style="color:var(--ok);">${contratos}</span></div>
       <div class="home-stat-row"><span class="home-stat-label">Visitas concretadas</span><span class="home-stat-val">${vMes.filter(r=>r.visitaConcretada==='SI').length}</span></div>
-      <div class="home-stat-row"><span class="home-stat-label">Con cierre</span><span class="home-stat-val" style="color:#2d5a27;">${vMes.filter(r=>r.huboCierre==='SI').length}</span></div>
+      <div class="home-stat-row"><span class="home-stat-label">Con cierre</span><span class="home-stat-val" style="color:var(--cartera);">${vMes.filter(r=>r.huboCierre==='SI').length}</span></div>
     `;
   }
 
@@ -2040,7 +2040,7 @@ function renderCobranzaUsuario() {
     setText('ucob-meta-pct', metaUser ? pct+'% alcanzado' : 'sin meta asignada');
     setText('ucob-meta-pct-txt', pct+'%');
     const bar = document.getElementById('ucob-meta-bar');
-    if (bar) { bar.style.width=Math.min(pct,100)+'%'; bar.style.background=pct>=100?'linear-gradient(90deg,#10b981,#34d399)':pct>=75?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#2d5a27,#4a8c3f)'; }
+    if (bar) { bar.style.width=Math.min(pct,100)+'%'; bar.style.background=pct>=100?'linear-gradient(90deg,var(--ok),var(--ok-light))':pct>=75?'linear-gradient(90deg,var(--warn),var(--warn-light))':'linear-gradient(90deg,var(--cartera),var(--cartera-light))'; }
   });
 
   // Lista cobros
@@ -2134,7 +2134,7 @@ function renderMetasPorUsuario() {
     setText('ger-usuarios-activos', usuariosConCobros + '/' + asesores.length);
     setText('ger-barra-pct', pctGlobal+'%');
     const bar = document.getElementById('ger-barra');
-    if (bar) { bar.style.width=Math.min(pctGlobal,100)+'%'; bar.style.background=pctGlobal>=100?'linear-gradient(90deg,#10b981,#34d399)':pctGlobal>=75?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#2d5a27,#4a8c3f)'; }
+    if (bar) { bar.style.width=Math.min(pctGlobal,100)+'%'; bar.style.background=pctGlobal>=100?'linear-gradient(90deg,var(--ok),var(--ok-light))':pctGlobal>=75?'linear-gradient(90deg,var(--warn),var(--warn-light))':'linear-gradient(90deg,var(--cartera),var(--cartera-light))'; }
 
     // Cards por asesor
     if (!asesores.length) { cont.innerHTML='<div class="empty-state">Sin usuarios registrados.</div>'; return; }
@@ -2157,7 +2157,7 @@ function renderMetasPorUsuario() {
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:var(--fs-xl);font-weight:700;color:#2d5a27;font-family:'Cormorant Garamond',serif;">
+            <div style="font-size:var(--fs-xl);font-weight:700;color:var(--cartera);font-family:'Cormorant Garamond',serif;">
               $${(u.cartera+u.expensas).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}
             </div>
             <div style="font-size:var(--fs-xs);color:var(--gris);">total cobrado ${mes}</div>
@@ -2166,19 +2166,19 @@ function renderMetasPorUsuario() {
         ${metaCob>0 ? `<div class="meta-barra-wrap">
           <div class="meta-barra-row">
             <span>💰 Cartera: $${u.cartera.toLocaleString('es-BO',{maximumFractionDigits:0})}</span>
-            <span style="color:${pctC>=100?'#10b981':pctC>=75?'#f59e0b':'#ef4444'};font-weight:600;">${pctC}% de $${Number(metaCob).toLocaleString('es-BO',{maximumFractionDigits:0})}</span>
+            <span style="color:${pctC>=100?'var(--ok)':pctC>=75?'var(--warn)':'var(--danger)'};font-weight:600;">${pctC}% de $${Number(metaCob).toLocaleString('es-BO',{maximumFractionDigits:0})}</span>
           </div>
           <div class="meta-barra-track">
-            <div class="meta-barra-fill" style="width:${Math.min(pctC,100)}%;background:${pctC>=100?'#10b981':pctC>=75?'#f59e0b':'#ef4444'};"></div>
+            <div class="meta-barra-fill" style="width:${Math.min(pctC,100)}%;background:${pctC>=100?'var(--ok)':pctC>=75?'var(--warn)':'var(--danger)'};"></div>
           </div>
         </div>` : ''}
         ${metaExp>0 ? `<div class="meta-barra-wrap">
           <div class="meta-barra-row">
             <span>🏘 Expensas: $${u.expensas.toLocaleString('es-BO',{maximumFractionDigits:0})}</span>
-            <span style="color:${pctE>=100?'#10b981':pctE>=75?'#f59e0b':'#ef4444'};font-weight:600;">${pctE}% de $${Number(metaExp).toLocaleString('es-BO',{maximumFractionDigits:0})}</span>
+            <span style="color:${pctE>=100?'var(--ok)':pctE>=75?'var(--warn)':'var(--danger)'};font-weight:600;">${pctE}% de $${Number(metaExp).toLocaleString('es-BO',{maximumFractionDigits:0})}</span>
           </div>
           <div class="meta-barra-track">
-            <div class="meta-barra-fill" style="width:${Math.min(pctE,100)}%;background:${pctE>=100?'#10b981':pctE>=75?'#f59e0b':'#7c3aed'};"></div>
+            <div class="meta-barra-fill" style="width:${Math.min(pctE,100)}%;background:${pctE>=100?'var(--ok)':pctE>=75?'var(--warn)':'var(--accent)'};"></div>
           </div>
         </div>` : ''}
         ${!metaCob&&!metaExp ? '<div style="font-size:var(--fs-sm);color:var(--gris);margin-top:4px;">Sin meta asignada este mes</div>' : ''}
@@ -2300,19 +2300,19 @@ function renderMarketing() {
     const metaLeads   = metas?.leads?.monto || 0;
     const metaVisitas = metas?.visitas?.monto || 0;
     const metaCierres = metas?.cierres?.monto || 0;
-    updateMetaBarra('mkt-leads',   delMes.length,         metaLeads,   '#2563eb');
-    updateMetaBarra('mkt-visitas', visitasDeLeads.length, metaVisitas, '#d97706');
-    updateMetaBarra('mkt-cierres', cierres.length,        metaCierres, '#10b981');
+    updateMetaBarra('mkt-leads',   delMes.length,         metaLeads,   'var(--info)');
+    updateMetaBarra('mkt-visitas', visitasDeLeads.length, metaVisitas, 'var(--warn)');
+    updateMetaBarra('mkt-cierres', cierres.length,        metaCierres, 'var(--ok)');
   });
 
   // Embudo
   const emEl = document.getElementById('mkt-embudo');
   if (emEl) {
     const etapas = [
-      { label:'Leads captados', n: delMes.length, color:'#2563eb' },
-      { label:'Visitas agendadas', n: visitasDeLeads.filter(r=>r.tipoVisita==='1era Visita').length, color:'#d97706' },
-      { label:'Visitas concretadas', n: visitasDeLeads.filter(r=>r.visitaConcretada==='SI').length, color:'#f59e0b' },
-      { label:'Cierres / Ventas', n: cierres.length, color:'#10b981' },
+      { label:'Leads captados', n: delMes.length, color:'var(--info)' },
+      { label:'Visitas agendadas', n: visitasDeLeads.filter(r=>r.tipoVisita==='1era Visita').length, color:'var(--warn)' },
+      { label:'Visitas concretadas', n: visitasDeLeads.filter(r=>r.visitaConcretada==='SI').length, color:'var(--warn)' },
+      { label:'Cierres / Ventas', n: cierres.length, color:'var(--ok)' },
     ];
     const max = Math.max(...etapas.map(e=>e.n), 1);
     emEl.innerHTML = etapas.map((e,i) => `
@@ -2351,7 +2351,7 @@ function renderLeads(datos) {
   }
   const cont = document.getElementById('mkt-leads-lista');
   if (!cont) return;
-  const estColor = { Nuevo:'#2563eb', Contactado:'#d97706', Agendado:'#10b981', Descartado:'#ef4444' };
+  const estColor = { Nuevo:'var(--info)', Contactado:'var(--warn)', Agendado:'var(--ok)', Descartado:'var(--danger)' };
   cont.innerHTML = datos.length ? datos.map(l => `
     <div class="cobro-card">
       <div class="cobro-card-left">
@@ -2578,7 +2578,7 @@ function renderCartaMeta() {
         <div style="font-size:var(--fs-xs);color:var(--gris);">${c.catNombre||'Sin categoría'} · ${c.mes||''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:var(--sp-2);">
-        <span style="font-size:var(--fs-md);font-weight:700;color:#2d5a27;">$${(c.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+        <span style="font-size:var(--fs-md);font-weight:700;color:var(--cartera);">$${(c.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
         <button onclick="window._fbRemoveCartaMeta('${c._key}')" class="btn-del" style="font-size:var(--fs-xs);padding:3px 6px;">🗑</button>
       </div>
     </div>`).join('')
@@ -2623,7 +2623,7 @@ function procesarExcelMeta(input) {
     const tbody = document.getElementById('meta-prev-body');
     if (tbody) tbody.innerHTML = metaExcelPend.map(r=>`<tr>
       <td>${esc(r.nombre)}</td>
-      <td style="font-weight:600;color:#2d5a27;">$${r.monto.toFixed(2)}</td>
+      <td style="font-weight:600;color:var(--cartera);">$${r.monto.toFixed(2)}</td>
       <td>${r.catNombre ? esc(r.catNombre) : '—'}${(!r.catKey && r.catNombre) ? ' <span style="font-size:var(--fs-xs);padding:1px 7px;border-radius:999px;background:var(--verde-bg);color:var(--verde);font-weight:600;">nueva</span>' : ''}</td>
     </tr>`).join('');
     const prev = document.getElementById('meta-excel-preview');
@@ -2733,7 +2733,7 @@ function renderCartaCobros() {
         <span style="font-size:var(--fs-2xs);font-weight:600;padding:2px 8px;border-radius:999px;margin-top:4px;display:inline-block;${sumaOn?'background:var(--ok-bg);color:var(--ok-ink);':'background:var(--warn-bg);color:var(--warn-ink);'}">${sumaOn?'✓ Suma meta':'✗ No suma'}</span>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-        <span style="font-size:var(--fs-base);font-weight:700;color:${sumaOn?'#2d5a27':'#d97706'};">$${(c.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+        <span style="font-size:var(--fs-base);font-weight:700;color:${sumaOn?'var(--cartera)':'var(--warn)'};">$${(c.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
         <div style="display:flex;gap:4px;">
           <button onclick="toggleSumaMeta_carta('${c._key}','${sumaOn?'NO':'SI'}')" style="font-size:var(--fs-2xs);padding:3px 7px;border:1px solid var(--line);border-radius:var(--r-sm);cursor:pointer;background:#f9fafb;">${sumaOn?'→ No suma':'→ Suma'}</button>
           <button onclick="eliminarCobro_carta('${c._key}')" class="btn-del" style="font-size:var(--fs-xs);padding:3px 6px;">🗑</button>
@@ -2790,7 +2790,7 @@ function renderCartaKPIs() {
   const bar = document.getElementById('cart-barra-main');
   if (bar) {
     bar.style.width=Math.min(pct,100)+'%';
-    bar.style.background=pct>=100?'linear-gradient(90deg,#10b981,#34d399)':pct>=75?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#2d5a27,#4a8c3f)';
+    bar.style.background=pct>=100?'linear-gradient(90deg,var(--ok),var(--ok-light))':pct>=75?'linear-gradient(90deg,var(--warn),var(--warn-light))':'linear-gradient(90deg,var(--cartera),var(--cartera-light))';
   }
 
   // Meta global del mes (de Firebase metas/)
@@ -2804,7 +2804,7 @@ function renderCartaKPIs() {
   _renderResumenCat('cart-resumen-si', siMeta, 'var(--verde)');
   setText('cart-subtotal-si', '$'+totalSi.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2}));
   // Resumen por categoría — NO suman
-  _renderResumenCat('cart-resumen-no', noMeta, '#d97706');
+  _renderResumenCat('cart-resumen-no', noMeta, 'var(--warn)');
   setText('cart-subtotal-no', '$'+totalNo.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2}));
   // Total general
   setText('cart-total-general', '$'+totalAll.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2}));
@@ -2846,7 +2846,7 @@ function renderCartaTabla() {
     return `<tr>
       <td><strong>${esc(c.nombre)}</strong></td>
       <td style="font-size:var(--fs-sm);">${c.catNombre||'—'}</td>
-      <td style="font-weight:600;color:${sumaOn?'#2d5a27':'#d97706'};">$${(c.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td style="font-weight:600;color:${sumaOn?'var(--cartera)':'var(--warn)'};">$${(c.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
       <td style="font-size:var(--fs-sm);text-align:center;">${c.semana||'—'}</td>
       <td style="font-size:var(--fs-sm);">${c.mes||'—'}</td>
       <td style="text-align:center;"><span style="font-size:var(--fs-xs);font-weight:600;padding:2px 8px;border-radius:999px;${sumaOn?'background:var(--ok-bg);color:var(--ok-ink);':'background:var(--warn-bg);color:var(--warn-ink);'}">${sumaOn?'✓ Sí':'✗ No'}</span></td>
@@ -2882,7 +2882,7 @@ function switchCartaTab(id) {
       btn.style.boxShadow     = t===id ? '0 1px 4px rgba(0,0,0,.06)' : 'none';
     }
   });
-  if (id==='resumen') { _renderResumenCat('cart-resumen-si', cartaCobroData.filter(c=>c.sumaMeta==='SI'&&c.mes===mesActual()&&c.anio===anioActual()), 'var(--verde)'); _renderResumenCat('cart-resumen-no', cartaCobroData.filter(c=>c.sumaMeta==='NO'&&c.mes===mesActual()&&c.anio===anioActual()), '#d97706'); }
+  if (id==='resumen') { _renderResumenCat('cart-resumen-si', cartaCobroData.filter(c=>c.sumaMeta==='SI'&&c.mes===mesActual()&&c.anio===anioActual()), 'var(--verde)'); _renderResumenCat('cart-resumen-no', cartaCobroData.filter(c=>c.sumaMeta==='NO'&&c.mes===mesActual()&&c.anio===anioActual()), 'var(--warn)'); }
   if (id==='detalle') renderCartaTabla();
   if (id==='meta')    renderCartaMeta();
   if (id==='cobros')  { renderCartaCobros(); populateCobFiltCat(); }
@@ -2916,9 +2916,9 @@ function abrirModalMetaCartera() {
 }
 
 const ESTADOS_COLOR = {
-  'Al día':    '#10b981', 'Vigente':    '#10b981', 'Pagado':    '#10b981',
-  'Mora':      '#ef4444', 'Mora 1-30':  '#f59e0b', 'Mora 31-60':'#ea580c',
-  'Mora +60':  '#ef4444', 'Parcial':    '#d97706', 'Sin gestión':'#9ca3af'
+  'Al día':    'var(--ok)', 'Vigente':    'var(--ok)', 'Pagado':    'var(--ok)',
+  'Mora':      'var(--danger)', 'Mora 1-30':  'var(--warn)', 'Mora 31-60':'var(--warn-strong)',
+  'Mora +60':  'var(--danger)', 'Parcial':    'var(--warn)', 'Sin gestión':'#9ca3af'
 };
 
 /* ── META CARTERA ── */
@@ -2979,7 +2979,7 @@ function procesarExcelCartaAdmin(input) {
       tbody.innerHTML = cartaAdminPend.map((r,i) => `<tr>
         <td style="color:var(--gris);font-size:var(--fs-sm);">${i+1}</td>
         <td><strong>${r.cliente}</strong></td>
-        <td style="font-weight:600;color:#2d5a27;">$${r.monto.toFixed(2)}</td>
+        <td style="font-weight:600;color:var(--cartera);">$${r.monto.toFixed(2)}</td>
         <td><span style="padding:2px 8px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;background:${ESTADOS_COLOR[r.estado]||'#9ca3af'}22;color:${ESTADOS_COLOR[r.estado]||'#6b7280'};">${r.estado}</span></td>
         <td style="font-size:var(--fs-sm);">${r.concepto}</td>
       </tr>`).join('');
@@ -3115,7 +3115,7 @@ function procesarExcelExpensas(input) {
     if (tbody) tbody.innerHTML = expensasExcelPend.map(r=>`<tr>
       <td>${esc(r.cliente)}</td>
       <td>${esc(r.terreno)}</td>
-      <td style="font-weight:600;color:#2d5a27;">${r.monto?'$'+r.monto.toLocaleString('es-BO'):'—'}</td>
+      <td style="font-weight:600;color:var(--cartera);">${r.monto?'$'+r.monto.toLocaleString('es-BO'):'—'}</td>
       <td>${esc(r.semana)}</td>
       <td>${esc(r.mes)}</td>
       <td>${esc(r.obs)}</td>
@@ -3175,9 +3175,9 @@ function renderExpensasAdmin() {
     const bar = document.getElementById('exp-barra');
     if (bar) {
       bar.style.width = Math.min(pct,100)+'%';
-      bar.style.background = pct>=100 ? 'linear-gradient(90deg,#10b981,#34d399)'
-                           : pct>=75  ? 'linear-gradient(90deg,#f59e0b,#fbbf24)'
-                           :            'linear-gradient(90deg,#2563eb,#7c3aed)';
+      bar.style.background = pct>=100 ? 'linear-gradient(90deg,var(--ok),var(--ok-light))'
+                           : pct>=75  ? 'linear-gradient(90deg,var(--warn),var(--warn-light))'
+                           :            'linear-gradient(90deg,var(--info),var(--accent))';
     }
     if (typeof updateHomeMetas === 'function') updateHomeMetas('expensas', total, meta, pct);
   });
@@ -3275,10 +3275,10 @@ function renderAdminMarketing() {
   const emEl = document.getElementById('adm-mkt-embudo');
   if (emEl) {
     const etapas = [
-      { label:'Leads captados',       n: delMes.length,                                          color:'#2563eb' },
-      { label:'Agendados',            n: delMes.filter(l=>l.estado==='Agendado').length,          color:'#d97706' },
-      { label:'Visitas concretadas',  n: visitasDeLeads.filter(r=>r.visitaConcretada==='SI').length, color:'#f59e0b' },
-      { label:'Cierres / Ventas',     n: cierres.length,                                          color:'#10b981' },
+      { label:'Leads captados',       n: delMes.length,                                          color:'var(--info)' },
+      { label:'Agendados',            n: delMes.filter(l=>l.estado==='Agendado').length,          color:'var(--warn)' },
+      { label:'Visitas concretadas',  n: visitasDeLeads.filter(r=>r.visitaConcretada==='SI').length, color:'var(--warn)' },
+      { label:'Cierres / Ventas',     n: cierres.length,                                          color:'var(--ok)' },
     ];
     const maxN = Math.max(...etapas.map(e=>e.n), 1);
     emEl.innerHTML = etapas.map((e,i) => `
@@ -3300,7 +3300,7 @@ function renderAdminMarketing() {
     const porFuente = {};
     delMes.forEach(l => { porFuente[l.fuente||'Otro'] = (porFuente[l.fuente||'Otro']||0)+1; });
     const maxF = Math.max(...Object.values(porFuente), 1);
-    const colFuente = ['#2563eb','#d97706','#10b981','#7c3aed','#ef4444','#ea580c'];
+    const colFuente = ['var(--info)','var(--warn)','var(--ok)','var(--accent)','var(--danger)','var(--warn-strong)'];
     fuentesEl.innerHTML = Object.entries(porFuente).sort((a,b)=>b[1]-a[1]).map(([f,n],i)=>`
       <div class="bar-item">
         <div class="bar-label"><span>${f}</span><span><strong>${n}</strong></span></div>
@@ -3317,7 +3317,7 @@ function renderAdminMarketing() {
     semanasEl.innerHTML = Object.entries(porSem).map(([s,n])=>`
       <div class="bar-item">
         <div class="bar-label"><span>${s}</span><span><strong>${n}</strong></span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${n/maxS*100}%;background:#2563eb;"></div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${n/maxS*100}%;background:var(--info);"></div></div>
       </div>`).join('');
   }
 
@@ -3326,7 +3326,7 @@ function renderAdminMarketing() {
   if (estadosEl) {
     const porEst = {};
     delMes.forEach(l => { porEst[l.estado||'Nuevo'] = (porEst[l.estado||'Nuevo']||0)+1; });
-    const colEst = { Nuevo:'#2563eb', Contactado:'#d97706', Agendado:'#10b981', Descartado:'#ef4444' };
+    const colEst = { Nuevo:'var(--info)', Contactado:'var(--warn)', Agendado:'var(--ok)', Descartado:'var(--danger)' };
     const maxE = Math.max(...Object.values(porEst), 1);
     estadosEl.innerHTML = Object.entries(porEst).sort((a,b)=>b[1]-a[1]).map(([e,n])=>`
       <div class="bar-item">
@@ -3421,13 +3421,13 @@ function renderFicheroVendedor() {
     setText('fichero-visitas-meta', metaVisitas || '—');
     setText('fichero-visitas-pct', pctV+'%');
     const bV = document.getElementById('fichero-visitas-bar');
-    if (bV) { bV.style.width=Math.min(pctV,100)+'%'; bV.style.background=pctV>=100?'linear-gradient(90deg,#10b981,#34d399)':pctV>=75?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#2563eb,#60a5fa)'; }
+    if (bV) { bV.style.width=Math.min(pctV,100)+'%'; bV.style.background=pctV>=100?'linear-gradient(90deg,var(--ok),var(--ok-light))':pctV>=75?'linear-gradient(90deg,var(--warn),var(--warn-light))':'linear-gradient(90deg,var(--info),var(--info-light))'; }
 
     setText('fichero-cierres-real', cierres);
     setText('fichero-cierres-meta', metaCierres || '—');
     setText('fichero-cierres-pct', pctC+'%');
     const bC = document.getElementById('fichero-cierres-bar');
-    if (bC) { bC.style.width=Math.min(pctC,100)+'%'; bC.style.background=pctC>=100?'linear-gradient(90deg,#10b981,#34d399)':pctC>=75?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#10b981,#34d399)'; }
+    if (bC) { bC.style.width=Math.min(pctC,100)+'%'; bC.style.background=pctC>=100?'linear-gradient(90deg,var(--ok),var(--ok-light))':pctC>=75?'linear-gradient(90deg,var(--warn),var(--warn-light))':'linear-gradient(90deg,var(--ok),var(--ok-light))'; }
   });
 
   // Lista registros del mes
@@ -3479,7 +3479,7 @@ function procesarExcelCobranza(input) {
     })).filter(r=>r.cliente);
     setText('cart-preview-count', cobranzaExcelPend.length);
     const tbody = document.getElementById('cart-preview-body');
-    if (tbody) tbody.innerHTML = cobranzaExcelPend.map(r=>`<tr><td>${r.cliente}</td><td>${r.terreno}</td><td style="font-weight:600;color:#2d5a27;">$${r.monto.toFixed(2)}</td><td>${r.estado}</td><td>${r.fecha}</td><td>${r.mes}</td></tr>`).join('');
+    if (tbody) tbody.innerHTML = cobranzaExcelPend.map(r=>`<tr><td>${r.cliente}</td><td>${r.terreno}</td><td style="font-weight:600;color:var(--cartera);">$${r.monto.toFixed(2)}</td><td>${r.estado}</td><td>${r.fecha}</td><td>${r.mes}</td></tr>`).join('');
     const prev = document.getElementById('cart-excel-preview');
     if (prev) prev.style.display = 'block';
   };
@@ -3502,9 +3502,9 @@ function cancelarImportCobranza() {
 }
 
 const ESTADOS_CARTERA_COLOR = {
-  'Al día':       '#10b981', 'Pagado':     '#10b981',
-  'Mora 1-30':    '#f59e0b', 'Mora 31-60': '#ea580c',
-  'Mora +60':     '#ef4444', 'Parcial':    '#d97706',
+  'Al día':       'var(--ok)', 'Pagado':     'var(--ok)',
+  'Mora 1-30':    'var(--warn)', 'Mora 31-60': 'var(--warn-strong)',
+  'Mora +60':     'var(--danger)', 'Parcial':    'var(--warn)',
   'Sin gestión':  '#9ca3af'
 };
 
@@ -3528,7 +3528,7 @@ function renderCobranzaKPIs() {
     setText('cart-meta-pct', meta ? pct+'% alcanzado' : 'sin meta asignada');
     setText('cart-barra-pct', pct+'%');
     const bar = document.getElementById('cart-barra');
-    if (bar) { bar.style.width=Math.min(pct,100)+'%'; bar.style.background=pct>=100?'linear-gradient(90deg,#10b981,#34d399)':pct>=75?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#2d5a27,#4a8c3f)'; }
+    if (bar) { bar.style.width=Math.min(pct,100)+'%'; bar.style.background=pct>=100?'linear-gradient(90deg,var(--ok),var(--ok-light))':pct>=75?'linear-gradient(90deg,var(--warn),var(--warn-light))':'linear-gradient(90deg,var(--cartera),var(--cartera-light))'; }
   });
 }
 
@@ -3729,7 +3729,7 @@ function renderCobros() {
     resEl.innerHTML = `<div style="display:flex;gap:var(--sp-3);flex-wrap:wrap;margin-bottom:8px;">
       <div style="background:var(--verde-bg);padding:10px 16px;border-radius:var(--r-md);font-size:var(--fs-base);">
         <span style="color:var(--gris);">Total filtrado:</span>
-        <strong style="color:#2d5a27;margin-left:6px;">$${totalFil.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong>
+        <strong style="color:var(--cartera);margin-left:6px;">$${totalFil.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</strong>
         <span style="color:var(--gris);margin-left:6px;">(${datos.length} registros)</span>
       </div>
       <div style="background:var(--info-bg);padding:10px 16px;border-radius:var(--r-md);font-size:var(--fs-base);">
@@ -3848,7 +3848,7 @@ function procesarArchivoExcel(file) {
         <td>${r.cliente}</td>
         <td>${r.terreno}</td>
         <td>${r.categoriaNombre}</td>
-        <td style="font-weight:600;color:#2d5a27;">$${r.monto.toFixed(2)}</td>
+        <td style="font-weight:600;color:var(--cartera);">$${r.monto.toFixed(2)}</td>
         <td>${r.mes}</td>
         <td>${r.anio}</td>
         <td><span class="suma-toggle ${r.sumaMeta==='SI'?'on':'off'}" style="cursor:default;">${r.sumaMeta==='SI'?'✓ Sí':'✗ No'}</span></td>
@@ -3918,8 +3918,8 @@ function renderResumenCobranza() {
           <div style="font-size:var(--fs-xs);color:var(--gris);">${c.categoriaNombre||'—'} · ${c.mes} ${c.anio}</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:var(--fs-md);font-weight:700;color:#2d5a27;">$${(c.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-          <div style="font-size:var(--fs-2xs);color:${c.sumaMeta==='SI'?'#10b981':'#9ca3af'};">${c.sumaMeta==='SI'?'✓ Suma meta':'✗ No suma'}</div>
+          <div style="font-size:var(--fs-md);font-weight:700;color:var(--cartera);">$${(c.monto||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div style="font-size:var(--fs-2xs);color:${c.sumaMeta==='SI'?'var(--ok)':'#9ca3af'};">${c.sumaMeta==='SI'?'✓ Suma meta':'✗ No suma'}</div>
         </div>
       </div>`).join('')
     : '<div style="font-size:var(--fs-base);color:var(--gris);">Sin cobros recientes.</div>';
@@ -3951,7 +3951,7 @@ function renderResumenCobranza() {
   if (prog) {
     prog.innerHTML = `
       <div class="prog-item"><div class="pv">${delMes.length}</div><div class="pl">Cobros mes</div></div>
-      <div class="prog-item"><div class="pv" style="color:#2d5a27;">$${total.toLocaleString('es-BO',{maximumFractionDigits:0})}</div><div class="pl">Total cobrado</div></div>
+      <div class="prog-item"><div class="pv" style="color:var(--cartera);">$${total.toLocaleString('es-BO',{maximumFractionDigits:0})}</div><div class="pl">Total cobrado</div></div>
       <div class="prog-item"><div class="pv" style="color:var(--info);">${clientes}</div><div class="pl">Clientes</div></div>
     `;
   }
@@ -4009,8 +4009,8 @@ function calcularMetaManual(tipo) {
       const barEl  = document.getElementById('meta-cob-bar');
       if (cobEl)  cobEl.textContent  = '$' + cobrado.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
       if (metaEl) metaEl.textContent = meta ? '$' + Number(meta).toLocaleString('es-BO') : '— (sin meta)';
-      if (pctEl)  { pctEl.textContent = pct+'%'; pctEl.style.color = pct>=100?'#10b981':pct>=75?'#f59e0b':'#ef4444'; }
-      if (barEl)  { barEl.style.width = Math.min(pct,100)+'%'; barEl.style.background = pct>=100?'linear-gradient(90deg,#10b981,#34d399)':pct>=75?'linear-gradient(90deg,#f59e0b,#fbbf24)':'linear-gradient(90deg,#ef4444,#f87171)'; }
+      if (pctEl)  { pctEl.textContent = pct+'%'; pctEl.style.color = pct>=100?'var(--ok)':pct>=75?'var(--warn)':'var(--danger)'; }
+      if (barEl)  { barEl.style.width = Math.min(pct,100)+'%'; barEl.style.background = pct>=100?'linear-gradient(90deg,var(--ok),var(--ok-light))':pct>=75?'linear-gradient(90deg,var(--warn),var(--warn-light))':'linear-gradient(90deg,var(--danger),var(--danger-light))'; }
       updateHomeMetas('cartera', cobrado, meta, pct);
     } else {
       const cobEl  = document.getElementById('meta-exp-cobrado');
@@ -4019,7 +4019,7 @@ function calcularMetaManual(tipo) {
       const barEl  = document.getElementById('meta-exp-bar');
       if (cobEl)  cobEl.textContent  = '$' + cobrado.toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
       if (metaEl) metaEl.textContent = meta ? '$' + Number(meta).toLocaleString('es-BO') : '— (sin meta)';
-      if (pctEl)  { pctEl.textContent = pct+'%'; pctEl.style.color = pct>=100?'#10b981':pct>=75?'#f59e0b':'#ef4444'; }
+      if (pctEl)  { pctEl.textContent = pct+'%'; pctEl.style.color = pct>=100?'var(--ok)':pct>=75?'var(--warn)':'var(--danger)'; }
       if (barEl)  barEl.style.width = Math.min(pct,100)+'%';
       updateHomeMetas('expensas', cobrado, meta, pct);
     }
