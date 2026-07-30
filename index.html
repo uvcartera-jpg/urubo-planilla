@@ -297,6 +297,39 @@
   </div>
 </div>
 
+<div id="edit-user-overlay">
+  <div class="confirm-box" style="max-width:460px;text-align:left;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <h3 style="margin:0;">✏️ Editar usuario</h3>
+      <button onclick="cerrarEditarAsesor()" style="background:none;border:none;font-size:22px;color:var(--gris);cursor:pointer;line-height:1;">×</button>
+    </div>
+    <input type="hidden" id="edit-asesor-key"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-bottom:14px;">
+      <div><label>Nombre</label><input type="text" id="edit-asesor-name"/></div>
+      <div>
+        <label>Nuevo PIN (opcional)</label>
+        <input type="text" class="pin-inp" id="edit-asesor-pin" placeholder="Dejar vacío = no cambiar" maxlength="4" style="max-width:100%;width:100%;"/>
+      </div>
+    </div>
+    <div style="margin-bottom:6px;">
+      <label style="margin-bottom:8px;display:block;">Módulos habilitados <span style="font-weight:400;color:var(--gris);">(podés marcar varios, ej. Cartera + Expensas)</span></label>
+      <div class="modulos-grid" id="edit-modulos-checkboxes">
+        <label class="modulo-check" onclick="toggleModuloEdit(this,'ventas')"><input type="checkbox" value="ventas">📋 Ventas</label>
+        <label class="modulo-check" onclick="toggleModuloEdit(this,'marketing')"><input type="checkbox" value="marketing">🔵 Marketing</label>
+        <label class="modulo-check" onclick="toggleModuloEdit(this,'cobranza')"><input type="checkbox" value="cobranza">💰 Cartera</label>
+        <label class="modulo-check" onclick="toggleModuloEdit(this,'expensas')"><input type="checkbox" value="expensas">🏘 Expensas</label>
+        <label class="modulo-check" onclick="toggleModuloEdit(this,'inventario')"><input type="checkbox" value="inventario">🗺 Inventario</label>
+        <label class="modulo-check" onclick="toggleModuloEdit(this,'dashboard')"><input type="checkbox" value="dashboard">📊 Dashboard</label>
+        <label class="modulo-check" onclick="toggleModuloEdit(this,'reportes')"><input type="checkbox" value="reportes">📈 Reportes</label>
+      </div>
+    </div>
+    <div class="confirm-actions" style="margin-top:18px;">
+      <button class="confirm-btn-cancel" onclick="cerrarEditarAsesor()">Cancelar</button>
+      <button class="confirm-btn-ok ok-positive" onclick="guardarEdicionAsesor()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <div id="login-screen">
   <div class="login-card">
     <div class="brand-top">

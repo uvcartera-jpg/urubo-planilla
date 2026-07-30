@@ -1234,6 +1234,17 @@ tr:hover td{ background:#fafffe; }
 .confirm-btn-ok.ok-positive:hover{ background:var(--verde-claro); }
 
 /* ══════════════════════════════════════════
+   MODAL EDITAR USUARIO
+══════════════════════════════════════════ */
+#edit-user-overlay{
+  position:fixed; inset:0; background:rgba(15,25,12,.55);
+  display:none; align-items:center; justify-content:center;
+  z-index:9998; padding:20px; backdrop-filter: blur(2px);
+}
+#edit-user-overlay.open{ display:flex; }
+#edit-user-overlay .confirm-box{ animation: confirmIn .25s ease-out; }
+
+/* ══════════════════════════════════════════
    BOTÓN GUARDAR CON ESTADO
 ══════════════════════════════════════════ */
 .btn-state{ position:relative; transition:background .2s; }

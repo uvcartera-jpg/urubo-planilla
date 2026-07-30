@@ -1234,6 +1234,7 @@ function renderAsesoresAdmin() {
       </div>
       <div class="vendor-actions">
         <span class="v-count">${cuentas[a.nombre]||0} reg. mes</span>
+        <button class="btn-remove-vendor" style="background:none;color:var(--ink-700);font-size:var(--fs-base);" onclick="abrirEditarAsesor('${a._key}')" title="Editar">✏️</button>
         <button class="btn-remove-vendor" onclick="eliminarAsesor('${a._key}','${escJs(a.nombre)}')" title="Eliminar">×</button>
       </div>
     </div>`;
@@ -1262,6 +1263,82 @@ async function agregarAsesor() {
 async function eliminarAsesor(key, nombre) {
     const _ok2 = await confirmDialog('Sus registros se conservaran en Firebase.', { title:'Eliminar usuario ' + nombre, okText:'Eliminar' }); if (!_ok2) return;
   await window._fbRemoveAsesor(key);
+}
+
+/* ═══════════════════════════════════════════
+   EDITAR USUARIO (nombre / PIN / módulos)
+═══════════════════════════════════════════ */
+let modulosSeleccionadosEdit = [];
+
+function inferRolFromModulos(mods) {
+  const sorted = [...mods].sort().join(',');
+  for (const r of Object.keys(ROL_MODULOS)) {
+    if (r === 'mixto') continue;
+    if ([...ROL_MODULOS[r]].sort().join(',') === sorted) return r;
+  }
+  return 'mixto';
+}
+
+function abrirEditarAsesor(key) {
+  const a = asesores.find(x => x._key === key);
+  if (!a) return;
+  const mods = a.modulos || ROL_MODULOS[a.rol || 'ventas'] || ['ventas'];
+  modulosSeleccionadosEdit = [...mods];
+
+  document.getElementById('edit-asesor-key').value = key;
+  document.getElementById('edit-asesor-name').value = a.nombre;
+  document.getElementById('edit-asesor-pin').value  = '';
+
+  document.querySelectorAll('#edit-modulos-checkboxes .modulo-check').forEach(label => {
+    const inp = label.querySelector('input');
+    const on  = mods.includes(inp.value);
+    inp.checked = on;
+    label.classList.toggle('sel', on);
+  });
+
+  document.getElementById('edit-user-overlay').classList.add('open');
+}
+
+function cerrarEditarAsesor() {
+  document.getElementById('edit-user-overlay').classList.remove('open');
+}
+
+function toggleModuloEdit(el, mod) {
+  el.classList.toggle('sel');
+  const inp = el.querySelector('input');
+  if (inp) inp.checked = el.classList.contains('sel');
+  modulosSeleccionadosEdit = Array.from(document.querySelectorAll('#edit-modulos-checkboxes .modulo-check.sel'))
+    .map(e => e.querySelector('input')?.value).filter(Boolean);
+}
+
+async function guardarEdicionAsesor() {
+  const key    = document.getElementById('edit-asesor-key').value;
+  const nombre = document.getElementById('edit-asesor-name').value.trim();
+  const pin    = document.getElementById('edit-asesor-pin').value.trim();
+
+  if (!nombre) { toastErr('El nombre es obligatorio.'); return; }
+  if (pin && (pin.length !== 4 || !/^\d{4}$/.test(pin))) {
+    toastErr('El PIN debe ser de 4 dígitos numéricos (o dejalo vacío para no cambiarlo).');
+    return;
+  }
+  if (!modulosSeleccionadosEdit.length) { toastErr('Elegí al menos un módulo.'); return; }
+  if (asesores.some(a => a._key !== key && a.nombre.toLowerCase() === nombre.toLowerCase())) {
+    toastErr('Ya existe otro usuario con ese nombre.'); return;
+  }
+
+  const data = {
+    nombre,
+    modulos: modulosSeleccionadosEdit,
+    rol: inferRolFromModulos(modulosSeleccionadosEdit)
+  };
+  if (pin) data.pin = pin;
+
+  const btn = document.querySelector('#edit-user-overlay .confirm-btn-ok');
+  btnLoading(btn, true);
+  await window._fbUpdateAsesor(key, data);
+  btnSuccess(btn);
+  toastOk('Usuario ' + nombre + ' actualizado.');
+  setTimeout(cerrarEditarAsesor, 500);
 }
 
 /* ═══════════════════════════════════════════
