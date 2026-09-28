@@ -530,7 +530,7 @@ function _restrictAdminPanelForRole(modulos) {
   });
   // Los ítems de sistema (usuarios, config, panel de control, eliminaciones) son
   // exclusivos de gerencia, se quedan ocultos para cualquier otra combinación.
-  ['nav-asesores','nav-config','nav-panelcontrol','nav-eliminaciones'].forEach(id => {
+  ['nav-asesores','nav-config','nav-panelcontrol','nav-eliminaciones','nav-cambios-categoria'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = 'none';
   });
 
@@ -607,6 +607,7 @@ function entrarAdmin() {
     renderAdminMarketing();
   });
   window._fbListenSolicitudesEliminacion(arr => { solicitudesEliminacionData = arr; renderSolicitudesEliminacionAdmin(); });
+  window._fbListenSolicitudesCambioCategoria(arr => { solicitudesCambioCategoriaData = arr; renderSolicitudesCambioCategoriaAdmin(); renderBuscarCobroCategorizado(); });
   window._fbListenOrigenes(arr => { origenesData = arr; renderOrigenes(); });
   window._fbListenOrangeMora(arr => { orangeMoraData = arr; renderOrangeMoraPanel(); });
   window._fbListenOrangeCartera(arr => { orangeCarteraData = arr; renderOrangeCarteraPanel(); });
@@ -718,6 +719,7 @@ const TAB_TITLES = {
   'home':'Inicio', 'dashboard':'Ventas', 'marketing-admin':'Marketing',
   'cartera':'Cartera', 'expensas':'Expensas', 'cobranza':'Cartera',
   'tabla':'Registros', 'contratos':'Ventas Concretadas', 'inventario':'Inventario', 'eliminaciones':'Eliminaciones',
+  'cambios-categoria':'Cambios de categoría',
   'panelcontrol':'Panel de Control', 'asesores':'Usuarios', 'config':'Config',
   'materia-reserva':'Materia Reservada de Venta', 'cotizaciones':'Cotizaciones'
 };
@@ -728,7 +730,7 @@ const NAV_GRUPOS = {
   'materia-reserva':'comercial', 'cotizaciones':'comercial',
   cartera:'finanzas', expensas:'finanzas', cobranza:'finanzas',
   inventario:'operaciones',
-  eliminaciones:'sistema', panelcontrol:'sistema', asesores:'sistema', config:'sistema',
+  eliminaciones:'sistema', 'cambios-categoria':'sistema', panelcontrol:'sistema', asesores:'sistema', config:'sistema',
 };
 
 function navAbrirGrupo(grupo) {
@@ -921,6 +923,124 @@ async function aprobarSolicitudEliminacion(key, coleccionPath) {
 async function rechazarSolicitudEliminacion(key) {
   await window._fbResolverSolicitudEliminacion(key, false);
   toastOk('Solicitud rechazada — el dato sigue intacto.');
+}
+
+/* ═══════════════════════════════════════════
+   SOLICITUDES DE CAMBIO DE CATEGORÍA (Cartera pide corregir → aprueba Gerencia)
+   Mismo patrón que Solicitudes de Eliminación: quien categoriza NO puede editar
+   una categoría ya asignada directamente — solo puede pedir el cambio, y recién
+   se aplica cuando Gerencia lo aprueba acá. Queda todo registrado (quién pidió,
+   qué cambio, quién aprobó y cuándo).
+═══════════════════════════════════════════ */
+let solicitudesCambioCategoriaData = [];
+
+async function solicitarCambioCategoria(cobroKey, categoriaActual, categoriaNueva, contextoTxt) {
+  if (!categoriaNueva || categoriaNueva === categoriaActual) return;
+  // No duplicar: si ya hay una solicitud pendiente para este mismo cobro, no dejar pedir otra.
+  const yaPendiente = solicitudesCambioCategoriaData.some(s => s.cobroKey === cobroKey && s.estado === 'pendiente');
+  if (yaPendiente) { toastErr('Ya hay una solicitud pendiente para este cobro — esperá a que Gerencia la resuelva.'); renderBuscarCobroCategorizado(); return; }
+  const ok = await confirmDialog(
+    'Se va a pedir cambiar la categoría de "' + (categoriaActual||'Sin categorizar') + '" a "' + categoriaNueva + '". No se aplica todavía: queda pendiente de autorización de Gerencia.',
+    { title:'Solicitar cambio de categoría', okText:'Solicitar', icon:'🔁' }
+  );
+  if (!ok) { renderBuscarCobroCategorizado(); return; }
+  await window._fbPushSolicitudCambioCategoria({
+    cobroKey, contexto: contextoTxt || '',
+    categoriaActual: categoriaActual || 'Sin categorizar', categoriaNueva,
+    solicitadoPorKey: asesorActual?._key || '', solicitadoPorNombre: asesorActual?.nombre || '',
+  });
+  toastOk('Solicitud enviada — queda pendiente de autorización de Gerencia.');
+  renderBuscarCobroCategorizado();
+}
+
+function renderSolicitudesCambioCategoriaAdmin() {
+  const pend = solicitudesCambioCategoriaData.filter(s => s.estado === 'pendiente');
+  const resueltas = solicitudesCambioCategoriaData.filter(s => s.estado !== 'pendiente').slice(0, 30);
+
+  const badge = document.getElementById('nav-cambiocat-badge');
+  if (badge) {
+    badge.style.display = pend.length ? 'flex' : 'none';
+    badge.textContent = pend.length;
+  }
+
+  const contP = document.getElementById('cambiocat-pendientes-lista');
+  if (contP) {
+    contP.innerHTML = pend.length ? pend.map(s => `
+      <div class="vendor-item" style="align-items:flex-start;">
+        <div>
+          <span class="v-name">${esc(s.contexto || s.cobroKey)}</span>
+          <div style="font-size:var(--fs-sm);margin-top:2px;"><b>${esc(s.categoriaActual)}</b> → <b style="color:var(--warn);">${esc(s.categoriaNueva)}</b></div>
+          <div style="font-size:var(--fs-xs);color:var(--gris);margin-top:2px;">Pedido por ${esc(s.solicitadoPorNombre||'—')} · ${new Date(s.ts).toLocaleString('es-BO')}</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button onclick="aprobarCambioCategoria('${s._key}')" style="padding:6px 12px;background:var(--ok);color:#fff;border:none;border-radius:var(--r-sm);font-size:var(--fs-sm);cursor:pointer;">✓ Aprobar y aplicar</button>
+          <button onclick="rechazarCambioCategoria('${s._key}')" style="padding:6px 12px;background:var(--fill);border:1.5px solid var(--line);border-radius:var(--r-sm);font-size:var(--fs-sm);cursor:pointer;">Rechazar</button>
+        </div>
+      </div>`).join('') : '<div class="empty-state">Sin solicitudes pendientes.</div>';
+  }
+
+  const contR = document.getElementById('cambiocat-resueltas-lista');
+  if (contR) {
+    contR.innerHTML = resueltas.length ? resueltas.map(s => `
+      <div class="vendor-item">
+        <span class="v-name">${esc(s.contexto || s.cobroKey)} — <span style="color:var(--gris);font-weight:400;">${esc(s.categoriaActual)} → ${esc(s.categoriaNueva)}</span></span>
+        <span style="font-size:var(--fs-xs);font-weight:600;color:${s.estado==='aprobada'?'var(--ok)':'var(--danger)'};">${s.estado==='aprobada'?('Aplicado por '+esc(s.aprobadoPorNombre||'—')):'Rechazado'}</span>
+      </div>`).join('') : '<div class="empty-state">Sin historial todavía.</div>';
+  }
+}
+
+async function aprobarCambioCategoria(key) {
+  const s = solicitudesCambioCategoriaData.find(x => x._key === key);
+  if (!s) return;
+  const ok = await confirmDialog(
+    'Se va a cambiar la categoría de este cobro de "' + s.categoriaActual + '" a "' + s.categoriaNueva + '".',
+    { title:'Aprobar cambio de categoría', okText:'Sí, aplicar' }
+  );
+  if (!ok) return;
+  await window._fbSetCategoriaCobro(s.cobroKey, { categoria: s.categoriaNueva, asignadoPorNombre: 'Corrección aprobada por ' + (asesorActual?.nombre || 'Gerencia') });
+  await window._fbResolverSolicitudCambioCategoria(key, true, asesorActual?.nombre || 'Gerencia');
+  toastOk('Categoría corregida y solicitud aprobada.');
+}
+
+async function rechazarCambioCategoria(key) {
+  await window._fbResolverSolicitudCambioCategoria(key, false, asesorActual?.nombre || 'Gerencia');
+  toastOk('Solicitud rechazada — la categoría no cambió.');
+}
+
+/* ── Buscar un cobro YA categorizado (por cliente o terreno) para pedir su corrección ── */
+function renderBuscarCobroCategorizado() {
+  const tbody = document.getElementById('cartera-categorizado-tbody');
+  if (!tbody) return;
+  const term = (document.getElementById('cartera-buscar-categorizado')?.value || '').trim().toLowerCase();
+  if (!term) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Escribí un cliente o terreno para buscar.</div></td></tr>'; return; }
+  if (typeof orangeCarteraDetalleRaw === 'undefined' || typeof carteraCategoriasData === 'undefined') return;
+
+  let categorizados = orangeCarteraDetalleRaw.filter(r => carteraCategoriasData[r.key] &&
+    (String(r.cliente||'').toLowerCase().includes(term) || String(r.terreno||'').toLowerCase().includes(term)));
+  categorizados = categorizados.sort((a,b) => (b.fechaOrden||0) - (a.fechaOrden||0)).slice(0, 100);
+
+  if (!categorizados.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">Sin coincidencias entre los cobros ya categorizados.</div></td></tr>'; return; }
+
+  const opciones = (typeof CARTERA_CATEGORIAS !== 'undefined' ? CARTERA_CATEGORIAS : []).map(c=>`<option value="${c}">${c}</option>`).join('');
+  tbody.innerHTML = categorizados.map(r => {
+    const catActual = carteraCategoriasData[r.key]?.categoria || 'Sin categorizar';
+    const pendiente = solicitudesCambioCategoriaData.some(s => s.cobroKey === r.key && s.estado === 'pendiente');
+    const contexto = r.cliente + ' — ' + r.terreno + ' (' + r.tipoPago + ', $' + Math.round(r.monto).toLocaleString('es-BO') + ', ' + r.fecha + ')';
+    return `<tr>
+      <td style="font-size:var(--fs-sm);">${esc(r.fecha)}</td>
+      <td>${esc(r.cliente)}</td>
+      <td style="font-family:monospace;font-size:var(--fs-sm);">${esc(r.terreno)}</td>
+      <td style="font-size:var(--fs-sm);">${r.tipoPago}</td>
+      <td style="font-weight:600;color:var(--cartera);">$${r.monto.toLocaleString('es-BO',{minimumFractionDigits:2})}</td>
+      <td><span style="font-weight:600;">${esc(catActual)}</span></td>
+      <td>${pendiente
+        ? '<span style="font-size:var(--fs-xs);font-weight:700;color:var(--warn);">⏳ Pendiente de aprobación</span>'
+        : `<select onchange="solicitarCambioCategoria('${r.key}','${escJs(catActual)}',this.value,'${escJs(contexto)}');this.value='';" style="padding:6px 10px;border:1.5px solid var(--line);border-radius:var(--r-sm);font-size:var(--fs-sm);font-family:'DM Sans',sans-serif;">
+            <option value="">Corregir a...</option>${opciones}
+          </select>`
+      }</td>
+    </tr>`;
+  }).join('');
 }
 
 

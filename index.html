@@ -247,6 +247,17 @@
     update(ref(db, `solicitudes_eliminacion/${key}`), { estado: aprobar?'aprobada':'rechazada', resueltoTs: Date.now() });
   window._fbRemoveGenerico = (path) => remove(ref(db, path));
 
+  /* ── SOLICITUDES DE CAMBIO DE CATEGORÍA (Cartera pide corregir una ya asignada, solo Gerencia aprueba) ── */
+  window._fbPushSolicitudCambioCategoria = (data) =>
+    push(ref(db, 'solicitudes_cambio_categoria'), { ...data, ts: Date.now(), estado: 'pendiente' });
+  window._fbListenSolicitudesCambioCategoria = (cb) =>
+    onValue(ref(db, 'solicitudes_cambio_categoria'), snap => {
+      const raw = snap.val() || {};
+      cb(Object.entries(raw).map(([k,v])=>({...v,_key:k})).sort((a,b)=>b.ts-a.ts));
+    });
+  window._fbResolverSolicitudCambioCategoria = (key, aprobar, aprobadoPorNombre) =>
+    update(ref(db, `solicitudes_cambio_categoria/${key}`), { estado: aprobar?'aprobada':'rechazada', resueltoTs: Date.now(), aprobadoPorNombre: aprobadoPorNombre||'' });
+
   /* ── COMENTARIOS DE SEGUIMIENTO (hilo por cliente, no se pisan entre sí) ── */
   window._fbPushComentarioSeguimiento = (clienteKey, data) =>
     push(ref(db, `seguimiento_comentarios/${clienteKey}`), { ...data, ts: Date.now() });
@@ -1841,6 +1852,9 @@
         <button class="nav-item" id="nav-eliminaciones" onclick="switchAdminTab('eliminaciones')">
           <span class="nav-icon">🗑</span> Eliminaciones <span id="nav-elim-badge" style="display:none;margin-left:auto;background:var(--danger);color:#0a0f0c;font-size:10px;font-weight:700;border-radius:999px;min-width:18px;height:18px;line-height:18px;text-align:center;padding:0 4px;">0</span>
         </button>
+        <button class="nav-item" id="nav-cambios-categoria" onclick="switchAdminTab('cambios-categoria')">
+          <span class="nav-icon">🔁</span> Cambios de categoría <span id="nav-cambiocat-badge" style="display:none;margin-left:auto;background:var(--warn);color:#0a0f0c;font-size:10px;font-weight:700;border-radius:999px;min-width:18px;height:18px;line-height:18px;text-align:center;padding:0 4px;">0</span>
+        </button>
         <button class="nav-item" id="nav-asesores" onclick="switchAdminTab('asesores')">
           <span class="nav-icon">👥</span> Usuarios
         </button>
@@ -2854,6 +2868,18 @@
       </div>
     </div>
 
+    <div class="tab-panel" id="panel-cambios-categoria">
+      <div class="admin-section">
+        <h3 style="margin:0 0 4px;">🔁 Solicitudes de cambio de categoría</h3>
+        <p style="font-size:var(--fs-sm);color:var(--gris);margin-bottom:16px;">Cuando alguien de Cartera se equivoca al categorizar un cobro y pide corregirlo, la solicitud queda acá — solo vos podés aprobarla y aplicar el cambio. Todo queda registrado: quién pidió, qué cambio, quién aprobó y cuándo.</p>
+        <div id="cambiocat-pendientes-lista"><div class="empty-state">Sin solicitudes pendientes.</div></div>
+      </div>
+      <div class="admin-section" style="margin-top:16px;">
+        <h3 style="margin:0 0 4px;">Historial resuelto</h3>
+        <div id="cambiocat-resueltas-lista"><div class="empty-state">Sin historial todavía.</div></div>
+      </div>
+    </div>
+
     <div class="tab-panel" id="panel-config">
       <div class="admin-section">
         <h3>PIN de administrador</h3>
@@ -3740,6 +3766,19 @@
         <div class="tabla-wrap" style="max-height:380px;overflow-y:auto;">
           <table><thead><tr><th>Fecha</th><th>Cliente</th><th>Terreno</th><th>Tipo</th><th>Monto</th><th>Categoría</th></tr></thead>
           <tbody id="cartera-categ-tbody"><tr><td colspan="6"><div class="empty-state">Cargando...</div></td></tr></tbody></table>
+        </div>
+      </div>
+
+      <!-- Buscar cobro YA categorizado y solicitar corrección (requiere autorización de Gerencia) -->
+      <div class="admin-section" style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+          <h3 style="margin:0;">🔎 Buscar cobro ya categorizado — corregir</h3>
+        </div>
+        <p style="font-size:var(--fs-sm);color:var(--gris);margin:2px 0 14px;">Si un cobro quedó mal categorizado, buscalo acá y pedí el cambio. No se aplica directo: queda pendiente hasta que Gerencia lo apruebe, y todo el historial se guarda.</p>
+        <input type="text" id="cartera-buscar-categorizado" placeholder="🔎 Buscar por cliente o terreno..." oninput="renderBuscarCobroCategorizado()" style="width:100%;max-width:420px;padding:9px 14px;border:1.5px solid var(--line);border-radius:var(--r-sm);font-size:var(--fs-base);font-family:'DM Sans',sans-serif;margin-bottom:12px;"/>
+        <div class="tabla-wrap" style="max-height:380px;overflow-y:auto;">
+          <table><thead><tr><th>Fecha</th><th>Cliente</th><th>Terreno</th><th>Tipo</th><th>Monto</th><th>Categoría actual</th><th>Corregir a</th></tr></thead>
+          <tbody id="cartera-categorizado-tbody"><tr><td colspan="7"><div class="empty-state">Escribí un cliente o terreno para buscar.</div></td></tr></tbody></table>
         </div>
       </div>
 
