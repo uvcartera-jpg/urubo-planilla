@@ -1320,7 +1320,7 @@ function abrirModalContratoFirmado(registroKey) {
   document.getElementById('cf-modulo').value = primerNum ? ('Mod. '+primerNum) : '';
   document.getElementById('cf-estatus').value = 'VENTA UV';
   const buscadoCf = String(r.terrenoInteres||'').trim().toLowerCase();
-  const loteCf = todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === buscadoCf);
+  const loteCf = _loteDeTerreno(buscadoCf);
   document.getElementById('cf-categoria').value = ['A','B','C'].includes(loteCf?.categoria) ? loteCf.categoria : (['A','B','C'].includes(r.calificacion) ? r.calificacion : 'B');
   document.getElementById('cf-ciudad-origen').value = r.ciudadProcedencia || '';
   document.getElementById('cf-dscto-adicional').value = '';
@@ -2298,7 +2298,7 @@ function renderAnalisisOrigenModalidad() {
     if (r.metraje) return r.metraje;
     if (!r.terrenoInteres) return null;
     const buscado = String(r.terrenoInteres).trim().toLowerCase();
-    const lote = todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === buscado);
+    const lote = _loteDeTerreno(buscado);
     return lote?.metraje || null;
   }
 
@@ -3044,6 +3044,7 @@ async function guardarDocumentoReserva() {
     accionPrecio: document.getElementById('mr-accion-precio').value,
     tc: document.getElementById('mr-tc').value,
     politicaPct: document.getElementById('mr-politica-pct').value,
+    categoria: document.getElementById('mr-categoria')?.value || '',
     autorizadoPor: document.getElementById('mr-autorizado-por').value,
     comentario: document.getElementById('mr-comentario').value,
     cuotas: docCuotasLineas.mr,
@@ -3135,7 +3136,7 @@ function _restaurarDatosDocGuardado(d) {
   docCuotasLineas.mr = d.cuotas || [];
   docCuotasLineas.mrAccion = d.cuotasAccion || [];
 
-  const lote = todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === String(r.terrenoInteres||'').trim().toLowerCase());
+  const lote = _loteDeTerreno(r.terrenoInteres);
   document.getElementById('mr-datos-auto').style.display = '';
   document.getElementById('mr-form').style.display = '';
   document.getElementById('mr-buscar').value = r.nombre;
@@ -3165,6 +3166,7 @@ function _restaurarDatosDocGuardado(d) {
   document.getElementById('mr-accion-precio').value = d.accionPrecio||'';
   document.getElementById('mr-tc').value = d.tc||'6.96';
   document.getElementById('mr-politica-pct').value = d.politicaPct||'';
+  if (document.getElementById('mr-categoria')) document.getElementById('mr-categoria').value = d.categoria || _categoriaDeVenta(r, _loteDeTerreno(r.terrenoInteres));
   document.getElementById('mr-autorizado-por').value = d.autorizadoPor||'';
   document.getElementById('mr-comentario').value = d.comentario||'';
 
@@ -3223,9 +3225,9 @@ function seleccionarReservaDoc(tipo, key) {
   docReservaSeleccionada[tipo] = r;
   if (tipo === 'mr') docActualKey = null; // arrancamos un documento nuevo, no seguimos editando otro
 
-  const lote = todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === String(r.terrenoInteres||'').trim().toLowerCase());
+  const lote = _loteDeTerreno(r.terrenoInteres);
   const modulo = lote?.modulo || '';
-  const categoria = lote?.categoria || '';
+  const categoria = _categoriaDeVenta(r, lote);
 
   document.getElementById(tipo+'-datos-auto').style.display = '';
   document.getElementById(tipo+'-form').style.display = '';
@@ -3253,8 +3255,9 @@ function seleccionarReservaDoc(tipo, key) {
     document.getElementById('mr-fecha').value = /^\d{4}-\d{2}-\d{2}$/.test(r.fecha || '') ? r.fecha : hoyIso;
     document.getElementById('mr-celular').value = '';
     document.getElementById('mr-correo').value = '';
-    const fMr = document.getElementById('mr-fecha'); fMr.onchange = () => _mrPintarPolitica(r, categoria);
-    _mrPintarPolitica(r, categoria);
+    const fMr = document.getElementById('mr-fecha'); fMr.onchange = () => _mrPintarPolitica(r);
+    const sCat = document.getElementById('mr-categoria'); if (sCat) { sCat.value = categoria; sCat.onchange = () => _mrPintarPolitica(r); }
+    _mrPintarPolitica(r);
   } else {
     document.getElementById('sc-fecha').value = hoyIso;
     document.getElementById('sc-celular').value = '';
@@ -3460,8 +3463,17 @@ function _mrFechaPolitica(r) {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T12:00:00') : (r?.ts ? new Date(r.ts) : new Date());
   return { anio: d.getFullYear(), mes: PC_MESES[d.getMonth()] };
 }
-function _mrPintarPolitica(r, categoria) {
+/* Categoría del terreno (A/B/C) para buscar la política: la del lote en Inventario; si el lote no la tiene, la de la venta concretada */
+function _categoriaDeVenta(r, lote) {
+  const c = String(lote?.categoria || '').trim().toUpperCase(); if (c) return c;
+  const vc = (typeof ventasConcretadasData !== 'undefined' ? ventasConcretadasData : []).find(v => v.registroKey === r?._key && v.categoria);
+  return vc ? String(vc.categoria).trim().toUpperCase() : '';
+}
+function _mrCategoria(r) { const s = document.getElementById('mr-categoria'); return (s && s.value) || _categoriaDeVenta(r, _loteDeTerreno(r?.terrenoInteres)); }
+function _mrPintarPolitica(r) {
+  const categoria = _mrCategoria(r);
   const { anio, mes } = _mrFechaPolitica(r);
+  if (!categoria) { document.getElementById('mr-politica-pct').value = ''; document.getElementById('mr-politica-nota').textContent = '(el lote no tiene categoría en Inventario: elegila arriba para traer la política)'; return; }
   const politica = categoria ? obtenerPoliticaDescuento(r.formaPago, categoria, anio, mes) : null;
   document.getElementById('mr-politica-pct').value = politica ? politica.pctMax + '%' : '';
   document.getElementById('mr-politica-nota').textContent = politica ? `(política de ${politica.mes} ${politica.anio}${politica.mes !== mes || politica.anio !== anio ? ', vigente en ' + mes + ' ' + anio : ''})` : `(sin política cargada para ${mes} ${anio} — completá a mano)`;
@@ -3469,9 +3481,9 @@ function _mrPintarPolitica(r, categoria) {
 function generarMateriaReservada() {
   const r = docReservaSeleccionada.mr;
   if (!r) { toastErr('Elegí una reserva primero.'); return; }
-  const lote = todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === String(r.terrenoInteres||'').trim().toLowerCase());
+  const lote = _loteDeTerreno(r.terrenoInteres);
   const modulo = lote?.modulo || '';
-  const categoria = lote?.categoria || '';
+  const categoria = _mrCategoria(r);
   const conAccion = document.getElementById('mr-con-accion').value === 'SI';
   const precioAccion = parseFloat(document.getElementById('mr-accion-precio').value)||0;
   const cuotas = docCuotasLineas.mr;
@@ -4066,7 +4078,7 @@ function renderDetalleCierres() {
     let loteActual = null;
     if (r.terrenoInteres) {
       const buscado = String(r.terrenoInteres).trim().toLowerCase();
-      loteActual = todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === buscado);
+      loteActual = _loteDeTerreno(buscado);
     }
     if (!metraje && loteActual?.metraje) metraje = loteActual.metraje;
     const categoriaTerreno = loteActual?.categoria || '';
@@ -4201,7 +4213,7 @@ function renderHistoricoMensualVentas() {
     let metraje = r.metraje;
     if (!metraje && r.terrenoInteres) {
       const buscado = String(r.terrenoInteres).trim().toLowerCase();
-      const lote = todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === buscado);
+      const lote = _loteDeTerreno(buscado);
       if (lote?.metraje) metraje = lote.metraje;
     }
     if (metraje) b.m2s.push(r.precioVenta/metraje);
@@ -5099,6 +5111,12 @@ function renderInvStats() {
 
 const PATRON_TERRENO = /^\d+-\d{1,2}-\d{1,3}$/;
 
+/* Busca el lote de un terreno aunque el código esté escrito distinto: "01-16-199", "1-16-199", "1 - 16 - 199" */
+function _normTerreno(t) { return String(t || '').trim().toLowerCase().split(/\s*-\s*/).map(x => /^\d+$/.test(x) ? String(+x) : x).join('-'); }
+function _loteDeTerreno(t) {
+  const b = String(t || '').trim().toLowerCase(); if (!b) return undefined;
+  return todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === b) || todosLotes.find(l => _normTerreno(_terrenoDeLote(l)) === _normTerreno(b));
+}
 function _terrenoDeLote(l) {
   return l.terreno || (l.uv && l.manzano && l.lote ? `${l.uv}-${l.manzano}-${l.lote}` : (l.codigo || '—'));
 }

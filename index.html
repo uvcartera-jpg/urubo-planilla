@@ -4155,7 +4155,9 @@ body.cb-abierto #toast-container .toast:not(.error){ display:none; }
           </div>
 
           <div style="margin-bottom:14px;">
-            <label>Política actual — % descuento máximo autorizado</label>
+            <label>Categoría del terreno <span style="font-weight:400;font-size:var(--fs-xs);color:var(--gris);">(sale del Inventario; si el lote no la tiene, elegila acá)</span></label>
+            <select id="mr-categoria" style="max-width:160px;margin-bottom:10px;"><option value="">—</option><option value="A">A</option><option value="B">B</option><option value="C">C</option></select>
+            <label>Política del mes de la venta — % descuento máximo autorizado</label>
             <div style="display:flex;gap:8px;align-items:center;">
               <input type="text" id="mr-politica-pct" placeholder="ej: 10%" style="max-width:160px;"/>
               <span id="mr-politica-nota" style="font-size:var(--fs-xs);color:var(--gris);"></span>
@@ -5230,7 +5232,7 @@ body.cb-abierto #toast-container .toast:not(.error){ display:none; }
 </div><!-- /admin-panel -->
 
 
-<script src="script.js"></script>
+<script src="script.js?v=20261109"></script>
 <link rel="stylesheet" href="tema.css"/>
 </body>
 </html>
