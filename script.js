@@ -3029,6 +3029,11 @@ async function guardarDocumentoReserva() {
   const r = docReservaSeleccionada.mr;
   if (!r) { toastErr('Elegí una reserva primero.'); return; }
 
+  // N° de materia: avisar si ya lo usa otro documento (de otra reserva)
+  const nroTxt = String(document.getElementById('mr-nro-reserva').value || '').trim();
+  const usado = nroTxt && documentosReservaData.find(x => String(x.nroReserva || '').trim() === nroTxt && x._key !== docActualKey && x.registroKey !== r._key);
+  if (usado && !confirm('El N° ' + nroTxt + ' ya lo tiene el documento de ' + (usado.cliente || '—') + '.\nEl siguiente libre es el ' + _mrSiguienteNro() + '.\n\n¿Guardar igual con el N° ' + nroTxt + '?')) return;
+
   const nombreQuienGuarda = asesorActual?.nombre || 'Admin';
   const data = {
     registroKey: r._key, cliente: r.nombre, terreno: r.terrenoInteres||'',
@@ -3219,6 +3224,11 @@ function buscarReservasDoc(tipo) {
   window['_docReservasVisibles_'+tipo] = reservas;
 }
 
+/* N° de materia reservada: el siguiente al número más alto ya guardado (se puede cambiar a mano) */
+function _mrSiguienteNro() {
+  const nums = (documentosReservaData || []).map(d => parseInt(String(d.nroReserva || '').replace(/\D/g, ''), 10)).filter(n => n > 0 && n < 1e6);
+  return nums.length ? Math.max(...nums) + 1 : todosRegs.filter(x => x.conclusion === 'Reserva').length;
+}
 function seleccionarReservaDoc(tipo, key) {
   const r = (window['_docReservasVisibles_'+tipo]||[]).find(x => x._key === key);
   if (!r) return;
@@ -3250,7 +3260,7 @@ function seleccionarReservaDoc(tipo, key) {
 
   const hoyIso = new Date().toISOString().split('T')[0];
   if (tipo === 'mr') {
-    document.getElementById('mr-nro-reserva').value = todosRegs.filter(x=>x.conclusion==='Reserva').length;
+    document.getElementById('mr-nro-reserva').value = _mrSiguienteNro();
     // La fecha del documento arranca en la fecha de la venta (registro), y la política es la de ese mes.
     document.getElementById('mr-fecha').value = /^\d{4}-\d{2}-\d{2}$/.test(r.fecha || '') ? r.fecha : hoyIso;
     document.getElementById('mr-celular').value = '';
@@ -3287,6 +3297,18 @@ function toggleCopropietarioDoc(tipo) {
   const contCel = document.getElementById(tipo+'-copropietario-celular-cont');
   if (contCel) contCel.style.display = si ? '' : 'none';
 }
+/* Acción del Country Club: precio fijo y plan de pagos estándar (el asesor solo ajusta las fechas) */
+const ACCION_PRECIO_DOC = 10000;
+const ACCION_PLAN_DOC = [['Reserva', 1000], ['Cuota 1', 2000], ['Cuota 2', 2000], ['Cuota 3', 2000], ['Cuota 4', 2000], ['Cuota final', 1000]];
+function _sumarMesesIso(iso, n) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date();
+  const dia = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); d.setDate(Math.min(dia, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function _planAccionDoc() {
+  const f0 = document.getElementById('mr-fecha')?.value || new Date().toISOString().split('T')[0];
+  return ACCION_PLAN_DOC.map(([concepto, monto], i) => ({ concepto, fecha: _sumarMesesIso(f0, i), monto, fijo: true }));
+}
 function toggleAccionDoc(tipo) {
   const si = document.getElementById(tipo+'-con-accion').value === 'SI';
   const cont = document.getElementById(tipo+'-accion-precio-cont');
@@ -3294,20 +3316,29 @@ function toggleAccionDoc(tipo) {
   if (tipo === 'mr') {
     const contCuotas = document.getElementById('mr-cuotas-accion-cont');
     if (contCuotas) contCuotas.style.display = si ? '' : 'none';
-    if (si && !docCuotasLineas.mrAccion.length) { docCuotasLineas.mrAccion = [{concepto:'Cuota 1', fecha:'', monto:0}]; renderCuotasLineasDoc('mrAccion'); }
+    if (si) {
+      const p = document.getElementById('mr-accion-precio'); if (p && !parseFloat(p.value)) p.value = ACCION_PRECIO_DOC;
+      // plan estándar: se arma solo si todavía no hay uno cargado
+      if (!docCuotasLineas.mrAccion.some(c => c.monto > 0)) docCuotasLineas.mrAccion = _planAccionDoc();
+      renderCuotasLineasDoc('mrAccion');
+    }
   }
 }
+function restablecerPlanAccionDoc() { docCuotasLineas.mrAccion = _planAccionDoc(); document.getElementById('mr-accion-precio').value = ACCION_PRECIO_DOC; renderCuotasLineasDoc('mrAccion'); }
 
 function renderCuotasLineasDoc(tipo) {
   const cont = document.getElementById(tipo+'-cuotas-lista');
   const lineas = docCuotasLineas[tipo];
+  // plan estándar de la acción: concepto y monto fijos, solo se cambian las fechas
+  const fijo = tipo === 'mrAccion' && lineas.length && lineas.every(c => c.fijo);
+  const btnAdd = document.querySelector(`button[onclick="agregarLineaPagoDoc('${tipo}')"]`); if (btnAdd && tipo === 'mrAccion') btnAdd.style.display = fijo ? 'none' : '';
   cont.innerHTML = lineas.map((c,i) => `
     <div style="display:grid;grid-template-columns:1fr 140px 140px 34px;gap:8px;margin-bottom:6px;align-items:center;">
-      <input type="text" value="${esc(c.concepto)}" placeholder="Concepto (ej: Cuota 1)" onchange="docCuotasLineas['${tipo}'][${i}].concepto=this.value" />
+      <input type="text" value="${esc(c.concepto)}" placeholder="Concepto (ej: Cuota 1)" ${c.fijo ? 'readonly style="background:var(--fill);"' : ''} onchange="docCuotasLineas['${tipo}'][${i}].concepto=this.value" />
       <input type="date" value="${c.fecha||''}" onchange="docCuotasLineas['${tipo}'][${i}].fecha=this.value" />
-      <input type="number" value="${c.monto||''}" step="0.01" onchange="docCuotasLineas['${tipo}'][${i}].monto=parseFloat(this.value)||0;recalcularTotalCuotasDoc('${tipo}');" />
-      <button type="button" onclick="quitarLineaPagoDoc('${tipo}',${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;">×</button>
-    </div>`).join('');
+      <input type="number" value="${c.monto||''}" step="0.01" ${c.fijo ? 'readonly style="background:var(--fill);"' : ''} onchange="docCuotasLineas['${tipo}'][${i}].monto=parseFloat(this.value)||0;recalcularTotalCuotasDoc('${tipo}');" />
+      ${c.fijo ? '<span></span>' : `<button type="button" onclick="quitarLineaPagoDoc('${tipo}',${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;">×</button>`}
+    </div>`).join('') + (fijo ? `<p style="font-size:var(--fs-xs);color:var(--gris);margin:4px 0 0;">Plan estándar de la acción ($${ACCION_PRECIO_DOC.toLocaleString('es-BO')}): solo se cambian las fechas.</p>` : (tipo === 'mrAccion' && lineas.length ? `<button type="button" onclick="restablecerPlanAccionDoc()" style="margin-top:4px;padding:5px 10px;background:none;border:1px solid var(--line);border-radius:var(--r-sm);cursor:pointer;font-size:var(--fs-xs);">Usar el plan estándar de la acción</button>` : ''));
   recalcularTotalCuotasDoc(tipo);
 }
 function agregarLineaPagoDoc(tipo) {
