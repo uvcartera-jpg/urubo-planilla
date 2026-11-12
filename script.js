@@ -1948,8 +1948,11 @@ function renderMisRegistros() {
     cont.innerHTML = '<div class="empty-state">Todavía no cargaste ningún registro.<br>Usá la pestaña "Cargar registro" para empezar.</div>';
     return;
   }
-  cont.innerHTML = misRegs.map(r => {
-    const vc = (typeof ventasConcretadasData !== 'undefined') ? ventasConcretadasData.find(v => v.registroKey === r._key) : null;
+  const lim = window._misRegLim || 150;
+  const lista = misRegs.length > lim ? misRegs.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, lim) : misRegs;
+  const vcPorReg = {}; (typeof ventasConcretadasData !== 'undefined' ? ventasConcretadasData : []).forEach(v => { if (v.registroKey && !vcPorReg[v.registroKey]) vcPorReg[v.registroKey] = v; });
+  cont.innerHTML = lista.map(r => {
+    const vc = vcPorReg[r._key] || null;
     let accionContrato = '';
     if (r.conclusion === 'Reserva') {
       if (!vc) {
@@ -1987,7 +1990,7 @@ function renderMisRegistros() {
         <button onclick="editarRegistroExistente('${r._key}')" style="padding:6px 14px;background:var(--fill);border:1.5px solid var(--line);border-radius:var(--r-sm);font-size:var(--fs-sm);font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">✏️ Editar / actualizar seguimiento</button>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (misRegs.length > lim ? `<div style="text-align:center;padding:14px;color:var(--gris);font-size:var(--fs-sm);">Mostrando los ${lim} más recientes de ${misRegs.length} · <button type="button" onclick="window._misRegLim=(window._misRegLim||150)+300;renderMisRegistros()" style="padding:6px 14px;background:var(--fill);border:1.5px solid var(--line);border-radius:var(--r-sm);font-weight:600;cursor:pointer;">Mostrar más</button></div>` : '');
 }
 
 /* ═══════════════════════════════════════════
@@ -5144,9 +5147,15 @@ const PATRON_TERRENO = /^\d+-\d{1,2}-\d{1,3}$/;
 
 /* Busca el lote de un terreno aunque el código esté escrito distinto: "01-16-199", "1-16-199", "1 - 16 - 199" */
 function _normTerreno(t) { return String(t || '').trim().toLowerCase().split(/\s*-\s*/).map(x => /^\d+$/.test(x) ? String(+x) : x).join('-'); }
+let _loteIdx = { ref: null, exacto: null, norm: null };
 function _loteDeTerreno(t) {
   const b = String(t || '').trim().toLowerCase(); if (!b) return undefined;
-  return todosLotes.find(l => String(_terrenoDeLote(l)).trim().toLowerCase() === b) || todosLotes.find(l => _normTerreno(_terrenoDeLote(l)) === _normTerreno(b));
+  if (_loteIdx.ref !== todosLotes || _loteIdx.n !== todosLotes.length) {   // se rearma solo cuando cambia el inventario
+    const ex = new Map(), no = new Map();
+    todosLotes.forEach(l => { const k = String(_terrenoDeLote(l)).trim().toLowerCase(); if (!ex.has(k)) ex.set(k, l); const n = _normTerreno(k); if (!no.has(n)) no.set(n, l); });
+    _loteIdx = { ref: todosLotes, n: todosLotes.length, exacto: ex, norm: no };
+  }
+  return _loteIdx.exacto.get(b) || _loteIdx.norm.get(_normTerreno(b));
 }
 function _terrenoDeLote(l) {
   return l.terreno || (l.uv && l.manzano && l.lote ? `${l.uv}-${l.manzano}-${l.lote}` : (l.codigo || '—'));
@@ -19816,9 +19825,15 @@ const REND_PANEL = {
   renderTendenciaMarketing: 'utab-marketing',
   renderHome: 'home-legado',
   homeV2Pintar: 'panel-home',
+  // panel del asesor y del usuario
+  renderMisRegistros: '@mis-reg-list', renderMisCotizacionesVendedor: '@mis-cotiz-tbody', renderListaLotesPicker: '@modal-selector-lote',
 };
+/* ¿Se está usando el panel de administración? (admin, Gerencia, Cartera y otros roles que entran ahí) */
+function _rendPanelAdmin() { if (typeof modoAdmin !== 'undefined' && modoAdmin) return true; const a = document.getElementById('admin-panel'); return !!a && a.getClientRects().length > 0; }
 function _rendVisible(pid) {
   if (document.hidden) return false;
+  if (pid === '@modal-selector-lote') return !!document.getElementById('modal-selector-lote')?.classList.contains('open');
+  if (pid[0] === '@') { const el = document.getElementById(pid.slice(1)); return !!el && el.getClientRects().length > 0; }
   if (pid === 'home-legado') { const h = document.getElementById('panel-home'); return !!h && h.classList.contains('active') && (!document.getElementById('home-v2') || h.classList.contains('h2-legado')); }
   const el = document.getElementById(pid); return !!el && el.getClientRects().length > 0;
 }
@@ -19838,7 +19853,7 @@ function rendPonerAlDia() {
   Object.entries(REND_PANEL).forEach(([fn, pid]) => {
     const f = window[fn]; if (typeof f !== 'function' || f.__rend) return;
     const w = function (...a) {
-      if ((typeof modoAdmin === 'undefined' || !modoAdmin) && pid !== 'panel-home' && pid !== 'home-legado') return f.apply(this, a);
+      if (pid[0] !== '@' && !_rendPanelAdmin() && pid !== 'panel-home' && pid !== 'home-legado') return f.apply(this, a);
       if (_rendVisible(pid)) { delete REND.pend[fn]; return f.apply(this, a); }
       REND.pend[fn] = { pid, a, self: this }; try { REND_SIEMPRE[fn]?.(); } catch (e) {}
     };
@@ -19848,6 +19863,7 @@ function rendPonerAlDia() {
   if (typeof sw === 'function') window.switchAdminTab = function (...a) { const o = sw.apply(this, a); rendPonerAlDia(); return o; };
   const su = window.switchUserTab;
   if (typeof su === 'function') window.switchUserTab = function (...a) { const o = su.apply(this, a); rendPonerAlDia(); return o; };
+  ['switchAsesorTab', 'abrirSelectorLote', 'cambiarModoCotizaciones', 'cambiarSubTabCotizVendedor'].forEach(fn => { const f = window[fn]; if (typeof f === 'function') window[fn] = function (...a) { const o = f.apply(this, a); rendPonerAlDia(); return o; }; });
   const hl = window.homeV2Legado;
   if (typeof hl === 'function') window.homeV2Legado = function (...a) { const o = hl.apply(this, a); rendPonerAlDia(); return o; };
 
