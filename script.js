@@ -440,6 +440,7 @@ function entrarAsesor() {
   const modulosSoloAdmin = ['cobranza', 'inventario', 'dashboard', 'reportes'];
   const necesitaAdmin = modulos.some(m => modulosSoloAdmin.includes(m));
   if (necesitaAdmin) {
+    window._tabsPermitidos = _tabsDeModulos(modulos);   // antes de entrar, para que no arranque en un panel que no le corresponde
     entrarAdmin();
     setTimeout(() => {
       _restrictAdminPanelForRole(modulos);
@@ -457,6 +458,27 @@ function entrarAsesor() {
   entrarUsuario();
 }
 
+/* Qué ítems del menú habilita cada módulo. Cartera (módulo Finanzas) ve solo Cartera y Expensas. */
+const MAPA_MODULO_NAV = {
+  dashboard:  ['nav-dashboard'],
+  marketing:  ['nav-marketing-admin'],
+  cobranza:   ['nav-cartera','nav-expensas'],
+  expensas:   ['nav-expensas'],
+  inventario: ['nav-inventario'],
+  ventas:     ['nav-tabla','nav-contratos'],
+};
+function _navDeModulos(modulos) {
+  const ids = new Set();
+  (modulos || []).forEach(m => (MAPA_MODULO_NAV[m] || []).forEach(id => ids.add(id)));
+  // Inicio (resumen de todas las áreas) solo si la persona tiene algo más que Finanzas
+  if ((modulos || []).some(m => m !== 'cobranza' && m !== 'expensas')) ids.add('nav-home');
+  return ids;
+}
+function _tabsDeModulos(modulos) {
+  const t = new Set([..._navDeModulos(modulos)].map(id => id.replace(/^nav-/, '')));
+  if (t.has('cartera')) t.add('cobranza');
+  return t;
+}
 // Restricción de sidebar según rol del usuario
 function _restrictAdminPanelForRole(modulos) {
   const a = asesorActual;
@@ -481,16 +503,8 @@ function _restrictAdminPanelForRole(modulos) {
   // Qué ítems del menú habilita CADA módulo — antes esto solo miraba UN rol y
   // ocultaba todo lo demás; ahora se suman los ítems de TODOS los módulos que
   // tenga la persona, así "Cartera + Expensas" muestra las dos, no solo una.
-  const mapaModuloNav = {
-    dashboard:  ['nav-dashboard'],
-    marketing:  ['nav-marketing-admin'],
-    cobranza:   ['nav-cartera','nav-materia-reserva','nav-cotizaciones'],
-    expensas:   ['nav-expensas'],
-    inventario: ['nav-inventario'],
-    ventas:     ['nav-tabla','nav-contratos'],
-  };
-  const idsPermitidos = new Set(['nav-home']);
-  modulos.forEach(m => (mapaModuloNav[m]||[]).forEach(id => idsPermitidos.add(id)));
+  const idsPermitidos = _navDeModulos(modulos);
+  window._tabsPermitidos = _tabsDeModulos(modulos);
 
   document.querySelectorAll('.nav-item').forEach(el => {
     el.style.display = idsPermitidos.has(el.id) ? '' : 'none';
@@ -19889,4 +19903,21 @@ function rendPonerAlDia() {
 
   // 3) animaciones de gráficos más cortas (menos trabajo del procesador)
   try { if (window.Chart?.defaults) { Chart.defaults.animation = Chart.defaults.animation || {}; Chart.defaults.animation.duration = 300; } } catch (e) {}
+})();
+
+/* ── Acceso por rol: un usuario restringido (ej. Cartera) solo puede abrir sus paneles, venga de donde venga la orden
+   (menú, buscador Ctrl+K, tarjetas de Inicio, alertas). Tampoco calcula en segundo plano lo que no ve. ── */
+(function () {
+  const sw = window.switchAdminTab;
+  if (typeof sw === 'function') window.switchAdminTab = function (id, ...r) {
+    const P = window._tabsPermitidos;
+    if (P && !P.has(id)) id = P.has('cartera') ? 'cartera' : ([...P][0] || 'home');
+    return sw.call(this, id, ...r);
+  };
+  const ea = window.entrarAdmin;
+  if (typeof ea === 'function') window.entrarAdmin = function (...a) { if (typeof modoAdmin !== 'undefined' && modoAdmin) window._tabsPermitidos = null; return ea.apply(this, a); };
+  const ez = window.entrarAsesor;
+  if (typeof ez === 'function') window.entrarAsesor = function (...a) { window._tabsPermitidos = null; return ez.apply(this, a); };   // se vuelve a calcular según el rol
+  const dv = window.decVigilar;
+  if (typeof dv === 'function') window.decVigilar = function (...a) { const P = window._tabsPermitidos; if (P && !P.has('decisiones')) return []; return dv.apply(this, a); };
 })();
